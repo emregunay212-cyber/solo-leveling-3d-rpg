@@ -197,6 +197,8 @@ export const SKILLS = {
     damageMultiplier: 1.5,
     scaleStat: 'str' as const,
     type: 'dash' as const,
+    rank: 'E' as const,
+    power: 5,
   },
   shadowShield: {
     id: 'shadowShield',
@@ -210,6 +212,8 @@ export const SKILLS = {
     scaleStat: 'int' as const,
     type: 'buff' as const,
     damageReduction: 0.6,
+    rank: 'E' as const,
+    power: 5,
   },
   shadowBurst: {
     id: 'shadowBurst',
@@ -222,6 +226,8 @@ export const SKILLS = {
     damageMultiplier: 3,
     scaleStat: 'int' as const,
     type: 'aoe' as const,
+    rank: 'D' as const,
+    power: 10,
   },
   sovereignAura: {
     id: 'sovereignAura',
@@ -236,6 +242,8 @@ export const SKILLS = {
     type: 'ultimate' as const,
     slowMultiplier: 0.5,
     slowDuration: 3,
+    rank: 'C' as const,
+    power: 20,
   },
 } as const;
 
@@ -280,6 +288,37 @@ export const SHADOW = {
   emissive: { r: 0.3, g: 0.1, b: 0.5 },
   alpha: 0.85,
   hpBarColor: { r: 0.4, g: 0.1, b: 0.6 },
+} as const;
+
+// ─── DUNGEON SISTEMI ───
+export const DUNGEON = {
+  ranks: ['E', 'D', 'C', 'B', 'A', 'S'] as const,
+  maxRankAbove: 2,
+  gateProximityRadius: 3,
+  bossSpawnDelay: 3,
+  arenaSize: { E: 40, D: 45, C: 50, B: 55, A: 60, S: 70 },
+  statMultiplier: { E: 1, D: 1.5, C: 2.5, B: 4, A: 6, S: 10 },
+  enemyCount: { E: 8, D: 10, C: 12, B: 14, A: 16, S: 20 },
+  bossHpMultiplier: 5,
+  bossDamageMultiplier: 3,
+  recommendedLevel: { E: 1, D: 5, C: 10, B: 20, A: 35, S: 60 },
+  rewards: {
+    xpMultiplier: { E: 1, D: 2, C: 3, B: 5, A: 8, S: 15 },
+    goldMultiplier: { E: 1, D: 2, C: 4, B: 7, A: 12, S: 20 },
+  },
+  deathPenalty: {
+    xpLossPercent: 0.35,
+    itemLossChance: 0.3,
+    canLevelDown: true,
+  },
+  cityRespawnLosesAll: true,
+  cooldownMinutes: { E: 30, D: 45, C: 60, B: 90, A: 120, S: 180 },
+} as const;
+
+// ─── OYUNCU RANK SISTEMI ───
+export const PLAYER_RANK = {
+  ranks: ['none', 'E', 'D', 'C', 'B', 'A', 'S'] as const,
+  skillPowerThresholds: { E: 10, D: 30, C: 60, B: 100, A: 150, S: 250 },
 } as const;
 
 // ─── GOLGE GELISTIRME ───

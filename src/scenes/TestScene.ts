@@ -38,8 +38,13 @@ import { ShadowManageUI } from '../ui/ShadowManageUI';
 import { ShadowStockPicker } from '../ui/ShadowStockPicker';
 import { BOOK_TO_SKILL_MAP } from '../data/shadowSkillBooks';
 import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
-import { SKILLS, MP, SHADOW } from '../config/GameConfig';
+import { SKILLS, MP, SHADOW, DUNGEON } from '../config/GameConfig';
 import { initDevConsole, disposeDevConsole } from '../systems/DevConsole';
+import { DungeonSelectUI } from '../ui/DungeonSelectUI';
+import { DungeonCooldownTracker } from '../dungeon/DungeonCooldownTracker';
+import { PlayerRankSystem } from '../progression/PlayerRankSystem';
+import type { DungeonRank } from '../dungeon/types';
+import type { DungeonScene } from './DungeonScene';
 
 export class TestScene implements GameScene {
   public name = 'test';
@@ -67,6 +72,11 @@ export class TestScene implements GameScene {
   private dropSystem!: DropSystem;
   private shadowManageUI!: ShadowManageUI;
   private shadowStockPicker!: ShadowStockPicker;
+  private dungeonSelectUI!: DungeonSelectUI;
+  private cooldownTracker!: DungeonCooldownTracker;
+  private playerRankSystem!: PlayerRankSystem;
+  private portalMesh: Mesh | null = null;
+  private wasNearPortal = false;
 
   // Player state
   private playerHp = 100;
@@ -172,6 +182,26 @@ export class TestScene implements GameScene {
     this.shadowArmy.setDamageNumbers(this.game.damageNumbers);
     this.shadowSelection = new ShadowSelection(this.game.engine.scene, this.shadowArmy, this.game.input);
     this.shadowSelection.setDamageNumbers(this.game.damageNumbers);
+
+    // Dungeon cooldown tracker
+    this.cooldownTracker = new DungeonCooldownTracker();
+
+    // Player rank system — baslangic yeteneklerini ekle
+    this.playerRankSystem = new PlayerRankSystem();
+    const startingSkills = Object.values(SKILLS).map(s => ({
+      id: s.id,
+      name: s.name,
+      rank: s.rank as import('../dungeon/types').PlayerRank,
+      power: s.power,
+      key: s.key,
+      type: s.type,
+    }));
+    this.playerRankSystem.initializeStartingSkills(startingSkills);
+
+    // Paylasilan state'i Game nesnesine aktar
+    this.game.levelSystem = this.levelSystem;
+    this.game.shadowProfileManager = this.shadowProfileManager;
+    this.game.shadowInventory = this.shadowInventory;
   }
 
   private initUI(scene: Scene): void {
@@ -197,6 +227,15 @@ export class TestScene implements GameScene {
       (name: string) => ENEMY_DEFS[name] ?? null,
     );
     this.shadowStockPicker = new ShadowStockPicker();
+
+    // Dungeon gate secim paneli
+    this.dungeonSelectUI = new DungeonSelectUI(
+      (rank: DungeonRank) => {
+        this.enterDungeon(rank);
+      },
+      this.cooldownTracker,
+      () => this.playerRankSystem.getRank(),
+    );
 
     // Kitap kullanma callback'i — envanterdeki kitabi tuketip skill'i guclendirir
     this.shadowManageUI.setOnUseBook((bookId: string): boolean => {
@@ -532,11 +571,49 @@ export class TestScene implements GameScene {
   }
 
   private updatePortal(dt: number): void {
-    const portal = this.game.engine.scene.getMeshByName('portal');
-    if (portal) {
-      portal.rotation.y += dt * SCENE.portalRotationSpeed;
-      portal.rotation.x = Math.sin(Date.now() / 1000) * SCENE.portalBobAmplitude;
+    if (!this.portalMesh) return;
+
+    this.portalMesh.rotation.y += dt * SCENE.portalRotationSpeed;
+    this.portalMesh.rotation.x = Math.sin(Date.now() / 1000) * SCENE.portalBobAmplitude;
+
+    // Portal yakinlik kontrolu — oyuncu yaklasinca DungeonSelectUI ac
+    if (this.playerAlive) {
+      const playerPos = this.game.player.getPosition();
+      const toPortal = playerPos.subtract(this.portalMesh.position);
+      toPortal.y = 0;
+      const dist = toPortal.length();
+      const isNear = dist < DUNGEON.gateProximityRadius;
+
+      if (isNear && !this.wasNearPortal && !this.dungeonSelectUI.isOpen()) {
+        this.dungeonSelectUI.open();
+      } else if (!isNear && this.wasNearPortal && this.dungeonSelectUI.isOpen()) {
+        this.dungeonSelectUI.close();
+      }
+      this.wasNearPortal = isNear;
     }
+  }
+
+  /** Dungeon'a gir — cooldown baslat, rank ayarla, sahne degistir */
+  private enterDungeon(rank: DungeonRank): void {
+    this.cooldownTracker.startCooldown(rank);
+
+    // Paylasilan state'i guncelle
+    this.game.levelSystem = this.levelSystem;
+    this.game.shadowProfileManager = this.shadowProfileManager;
+    this.game.shadowInventory = this.shadowInventory;
+    this.game.dungeonRank = rank;
+
+    // DungeonScene'e rank aktar ve sahne degistir
+    const dungeonScene = this.game.sceneManager.getScene('dungeon') as DungeonScene | undefined;
+    if (dungeonScene) {
+      dungeonScene.setRank(rank);
+    }
+
+    this.game.sceneManager.switchTo('dungeon').catch((err: unknown) => {
+      if (err instanceof Error) {
+        throw new Error(`Dungeon entry failed: ${err.message}`);
+      }
+    });
   }
 
   // ─── SHADOW EXTRACTION ───
@@ -854,6 +931,7 @@ export class TestScene implements GameScene {
     pMat.emissiveColor = new Color3(0.3, 0.1, 0.6);
     torus.material = pMat;
     this.meshes.push(torus);
+    this.portalMesh = torus;
   }
 
   onExit(): void {}
@@ -881,6 +959,7 @@ export class TestScene implements GameScene {
     this.shadowUI?.dispose();
     this.shadowManageUI?.dispose();
     this.shadowStockPicker?.dispose();
+    this.dungeonSelectUI?.dispose();
     disposeDevConsole();
   }
 }

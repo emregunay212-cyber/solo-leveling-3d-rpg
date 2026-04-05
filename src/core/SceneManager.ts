@@ -40,6 +40,10 @@ export class SceneManager {
     return this.activeScene;
   }
 
+  public getScene(name: string): GameScene | undefined {
+    return this.scenes.get(name);
+  }
+
   public dispose(): void {
     this.scenes.forEach(scene => scene.onDispose());
     this.scenes.clear();

@@ -36,12 +36,18 @@ const orcDrops: readonly DropEntry[] = [
 const darkKnightDrops: readonly DropEntry[] = [
   { itemId: 'book_shadow_burst_up',  itemType: 'skillbook', chance: 0.04, minLevel: 8 },
   { itemId: 'book_shadow_shield_up', itemType: 'skillbook', chance: 0.03, minLevel: 4 },
+  { itemId: 'skill_lightning_chain', itemType: 'skillbook', chance: 0.02, minLevel: 10 },
+  { itemId: 'skill_flame_burst',     itemType: 'skillbook', chance: 0.02, minLevel: 10 },
 ] as const;
 
 // ─── SEYTAN / DEMON (lv12) — boss only ───
 const demonDrops: readonly DropEntry[] = [
   { itemId: 'book_shadow_burst_up',     itemType: 'skillbook', chance: 0.05, minLevel: 8 },
   { itemId: 'book_sovereign_aura_up',   itemType: 'skillbook', chance: 0.03, minLevel: 12 },
+  { itemId: 'skill_blood_rage',         itemType: 'skillbook', chance: 0.02, minLevel: 15 },
+  { itemId: 'skill_ice_prison',         itemType: 'skillbook', chance: 0.01, minLevel: 20 },
+  { itemId: 'skill_shadow_domain',      itemType: 'skillbook', chance: 0.005, minLevel: 30 },
+  { itemId: 'skill_void_strike',        itemType: 'skillbook', chance: 0.005, minLevel: 30 },
 ] as const;
 
 // ─── EXPORT ───

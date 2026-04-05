@@ -13,6 +13,8 @@ export interface SkillDef {
   readonly damageMultiplier: number;
   readonly scaleStat: 'str' | 'int';
   readonly type: 'dash' | 'buff' | 'aoe' | 'ultimate';
+  readonly rank?: string;                // 'E' | 'D' | 'C' | 'B' | 'A' | 'S' — skill rank for player rank calculation
+  readonly power?: number;               // skill power value (contributes to player rank)
   readonly damageReduction?: number;     // buff: hasar azaltma orani
   readonly slowMultiplier?: number;      // ultimate: yavaslama carpani
   readonly slowDuration?: number;        // ultimate: yavaslama suresi

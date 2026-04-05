@@ -9,6 +9,11 @@ import { CombatSystem } from './combat/CombatSystem';
 import { DamageNumbers } from './combat/DamageNumbers';
 import { HUD } from './ui/HUD';
 import { TestScene } from './scenes/TestScene';
+import { DungeonScene } from './scenes/DungeonScene';
+import type { LevelSystem } from './progression/LevelSystem';
+import type { ShadowProfileManager } from './shadows/ShadowProfileManager';
+import type { ShadowInventory } from './systems/ShadowInventory';
+import type { DungeonRank } from './dungeon/types';
 
 export class Game {
   public engine: Engine;
@@ -22,6 +27,12 @@ export class Game {
   public damageNumbers!: DamageNumbers;
   public hud!: HUD;
 
+  // Sahneler arasi paylasilan state
+  public levelSystem?: LevelSystem;
+  public shadowProfileManager?: ShadowProfileManager;
+  public shadowInventory?: ShadowInventory;
+  public dungeonRank?: DungeonRank;
+
   constructor() {
     this.engine = new Engine('gameCanvas');
     this.input = new InputManager(this.engine.getCanvas());
@@ -33,9 +44,12 @@ export class Game {
     // Initialize Havok physics engine
     await this.engine.initPhysics();
 
-    // Create test scene (Phase 1 - will be replaced with MainMenu later)
+    // Create scenes
     const testScene = new TestScene(this);
     this.sceneManager.register(testScene);
+
+    const dungeonScene = new DungeonScene(this);
+    this.sceneManager.register(dungeonScene);
 
     // Load initial scene
     await this.sceneManager.switchTo('test');

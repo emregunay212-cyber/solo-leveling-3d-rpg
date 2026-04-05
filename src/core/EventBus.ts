@@ -2,6 +2,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { Enemy } from '../enemies/Enemy';
 import type { ShadowRank } from '../shadows/ShadowEnhancementTypes';
 import type { ShadowCombatMode } from '../shadows/ShadowAI';
+import type { DungeonRank, DungeonRewards, PlayerRank } from '../dungeon/types';
 
 /**
  * Oyun olay tanimlari.
@@ -28,6 +29,12 @@ export interface GameEvents {
   'shadow:rankUp': { shadowUid: number; newRank: ShadowRank; rankName: string };
   'loot:drop': { itemId: string; itemType: 'skillbook'; enemyName: string };
   'shadow:modeChanged': { mode: ShadowCombatMode };
+  'dungeon:enter': { rank: DungeonRank };
+  'dungeon:exit': { rank: DungeonRank; completed: boolean; rewards: DungeonRewards };
+  'dungeon:bossSpawn': { bossType: string };
+  'dungeon:bossDeath': { bossType: string };
+  'dungeon:waveCleared': { remaining: number };
+  'player:rankChanged': { oldRank: PlayerRank; newRank: PlayerRank };
 }
 
 type EventCallback<T> = (data: T) => void;
