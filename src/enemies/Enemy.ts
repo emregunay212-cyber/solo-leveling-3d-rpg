@@ -22,6 +22,8 @@ export interface EnemyDef {
   color: Color3;
   scale: number;
   level: number;
+  isBoss: boolean;
+  shadowSkillIds: readonly string[];
 }
 
 /**

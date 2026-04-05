@@ -35,6 +35,7 @@ import { ShadowProfileManager } from '../shadows/ShadowProfileManager';
 import { ShadowInventory } from '../systems/ShadowInventory';
 import { DropSystem } from '../systems/DropSystem';
 import { ShadowManageUI } from '../ui/ShadowManageUI';
+import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
 import { SKILLS, MP, SHADOW } from '../config/GameConfig';
 import { initDevConsole, disposeDevConsole } from '../systems/DevConsole';
 
@@ -161,8 +162,8 @@ export class TestScene implements GameScene {
     this.shadowInventory = new ShadowInventory();
     this.dropSystem = new DropSystem(this.shadowInventory);
 
-    // Shadow army + selection (pass profileManager)
-    this.shadowArmy = new ShadowArmy(this.game.engine.scene, this.shadowProfileManager);
+    // Shadow army + selection (pass playerStats and profileManager)
+    this.shadowArmy = new ShadowArmy(this.game.engine.scene, this.getPlayerStats(), this.shadowProfileManager);
     this.shadowArmy.setDamageNumbers(this.game.damageNumbers);
     this.shadowSelection = new ShadowSelection(this.game.engine.scene, this.shadowArmy, this.game.input);
     this.shadowSelection.setDamageNumbers(this.game.damageNumbers);
@@ -191,11 +192,15 @@ export class TestScene implements GameScene {
       (name: string) => ENEMY_DEFS[name] ?? null,
     );
 
-    // Tab key toggles shadow manage UI
+    // Tab key toggles shadow manage UI, G key toggles shadow combat mode
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Tab') {
         e.preventDefault();
         this.shadowManageUI.toggle();
+      }
+      if (e.code === 'KeyG') {
+        const newMode = this.shadowArmy.toggleMode();
+        this.shadowUI.updateMode(newMode);
       }
     });
 
@@ -306,6 +311,11 @@ export class TestScene implements GameScene {
 
     eventBus.emit('player:damage', { amount: result.damage, type: result.type });
     this.updateHUD();
+
+    // Savunma modunda oyuncu saldirildiginda golgeleri saldiran dusmana yonlendir
+    if (this.shadowArmy.getMode() === 'defense' && this.shadowArmy.getAliveCount() > 0) {
+      this.shadowArmy.commandAllToAttack(enemy);
+    }
 
     if (this.playerHp <= 0 && this.playerAlive) {
       this.playerAlive = false;
@@ -454,6 +464,7 @@ export class TestScene implements GameScene {
       this.levelSystem.getMpRegen(),
     );
     this.shadowUI.updateSoulSlots(this.shadowArmy.getSoulSlots());
+    this.shadowUI.updateMode(this.shadowArmy.getMode());
 
     this.updateComboIndicator();
     this.updatePortal(dt);
@@ -692,6 +703,16 @@ export class TestScene implements GameScene {
     this.game.hud.setGold(this.gold);
   }
 
+  /** Oyuncu statlarini PlayerStats nesnesi olarak dondur (golge stat hesaplamasi icin) */
+  private getPlayerStats(): PlayerStats {
+    return {
+      str: this.levelSystem.str,
+      vit: this.levelSystem.vit,
+      agi: this.levelSystem.agi,
+      int: this.levelSystem.int,
+    };
+  }
+
   private applyStats(): void {
     this.playerMaxHp = this.levelSystem.getMaxHp();
     this.playerHp = Math.min(this.playerHp, this.playerMaxHp);
@@ -699,6 +720,12 @@ export class TestScene implements GameScene {
     this.playerMp = Math.min(this.playerMp, this.playerMaxMp);
     this.game.playerCombat.setBaseDamage(this.levelSystem.getAttackDamage());
     this.game.playerCombat.getComboSystem().setAttackSpeed(this.levelSystem.getAttackSpeed());
+
+    // Golge ordusuna guncel oyuncu statlarini aktar
+    const ps = this.getPlayerStats();
+    this.shadowArmy.setPlayerStats(ps);
+    this.shadowManageUI.setPlayerStats(ps);
+
     this.updateHUD();
   }
 

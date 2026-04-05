@@ -1,4 +1,5 @@
 import type { SoulSlot } from '../shadows/ShadowArmy';
+import type { ShadowCombatMode } from '../shadows/ShadowAI';
 
 /**
  * Golge ordusu UI — Solo Leveling temali sayac + stok slotlari.
@@ -7,6 +8,7 @@ export class ShadowUI {
   private container: HTMLDivElement;
   private countText!: HTMLSpanElement;
   private extractModeIndicator!: HTMLDivElement;
+  private modeIndicator!: HTMLSpanElement;
   private slotElements: HTMLDivElement[] = [];
   private onSlotClick: ((slotIndex: number) => void) | null = null;
 
@@ -93,10 +95,10 @@ export class ShadowUI {
           font-weight: 900;
           line-height: 1;
         }
-        .soul-slot-equip {
+        .soul-slot-boss {
           position: absolute;
           bottom: 2px; right: 14px;
-          font-size: 7px;
+          font-size: 8px;
           color: #f59e0b;
           font-weight: 700;
         }
@@ -147,6 +149,26 @@ export class ShadowUI {
           box-shadow: 0 0 3px rgba(250,204,21,0.4);
         }
 
+        /* ─── SAVAS MODU GOSTERGESI ─── */
+        .shadow-mode {
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          padding: 1px 6px;
+          border-radius: 3px;
+          text-transform: uppercase;
+        }
+        .shadow-mode.attack {
+          color: #ff6b6b;
+          background: rgba(255,107,107,0.15);
+          border: 1px solid rgba(255,107,107,0.3);
+        }
+        .shadow-mode.defense {
+          color: #60a5fa;
+          background: rgba(96,165,250,0.15);
+          border: 1px solid rgba(96,165,250,0.3);
+        }
+
         /* ─── CIKARMA MODU ─── */
         .extract-mode {
           position: absolute;
@@ -171,6 +193,7 @@ export class ShadowUI {
       <div class="shadow-panel">
         <div class="shadow-header">
           <span class="shadow-label">GOLGELER</span>
+          <span class="shadow-mode defense" id="shadow-mode">SAVUNMA</span>
           <span class="shadow-count" id="shadow-count">0 / 3</span>
         </div>
         <div class="soul-slots" id="soul-slots"></div>
@@ -181,6 +204,7 @@ export class ShadowUI {
     document.body.appendChild(this.container);
     this.countText = document.getElementById('shadow-count') as HTMLSpanElement;
     this.extractModeIndicator = document.getElementById('extract-mode') as HTMLDivElement;
+    this.modeIndicator = document.getElementById('shadow-mode') as HTMLSpanElement;
 
     // 4 stok slotu
     const slotsContainer = document.getElementById('soul-slots')!;
@@ -193,7 +217,7 @@ export class ShadowUI {
         <span class="soul-slot-count" id="soul-count-${i}"></span>
         <span class="soul-slot-hp" id="soul-hp-${i}"></span>
         <span class="soul-slot-rank" id="soul-rank-${i}"></span>
-        <span class="soul-slot-equip" id="soul-equip-${i}"></span>
+        <span class="soul-slot-boss" id="soul-boss-${i}"></span>
       `;
       const slotIndex = i;
       slot.addEventListener('click', () => {
@@ -227,6 +251,16 @@ export class ShadowUI {
     }
   }
 
+  public updateMode(mode: ShadowCombatMode): void {
+    if (mode === 'attack') {
+      this.modeIndicator.textContent = 'SALDIRI';
+      this.modeIndicator.className = 'shadow-mode attack';
+    } else {
+      this.modeIndicator.textContent = 'SAVUNMA';
+      this.modeIndicator.className = 'shadow-mode defense';
+    }
+  }
+
   public updateSoulSlots(slots: readonly SoulSlot[]): void {
     const rankColors: Record<string, string> = {
       soldier: '#aaa', knight: '#4ade80', elite: '#60a5fa', commander: '#f59e0b',
@@ -239,7 +273,7 @@ export class ShadowUI {
       const countEl = document.getElementById(`soul-count-${i}`)!;
       const hpEl = document.getElementById(`soul-hp-${i}`)!;
       const rankEl = document.getElementById(`soul-rank-${i}`)!;
-      const equipEl = document.getElementById(`soul-equip-${i}`)!;
+      const bossEl = document.getElementById(`soul-boss-${i}`)!;
 
       if (slot && slot.count > 0 && slot.enemyDefId) {
         el.classList.add('filled');
@@ -250,19 +284,22 @@ export class ShadowUI {
         const allFull = slot.hpPercents.every(hp => hp >= 1);
         hpEl.className = 'soul-slot-hp' + (allFull ? ' full' : ' healing');
 
-        // Rank indicator — first profile's rank
+        // Rank indicator — only meaningful for boss shadows
         if (slot.profiles.length > 0) {
-          const topRank = slot.profiles[0].rank;
-          const letter = topRank[0].toUpperCase();
-          rankEl.textContent = letter;
-          rankEl.style.color = rankColors[topRank] ?? '#aaa';
-          // Equipment count from first profile
-          const eq = slot.profiles[0].equipment;
-          const eqCount = [eq.weapon, eq.shield, eq.armor].filter(Boolean).length;
-          equipEl.textContent = eqCount > 0 ? `+${eqCount}` : '';
+          const topProfile = slot.profiles[0];
+          if (topProfile.isBoss) {
+            const topRank = topProfile.rank;
+            const letter = topRank[0].toUpperCase();
+            rankEl.textContent = letter;
+            rankEl.style.color = rankColors[topRank] ?? '#aaa';
+            bossEl.textContent = '\u2605'; // star icon for boss
+          } else {
+            rankEl.textContent = '';
+            bossEl.textContent = '';
+          }
         } else {
           rankEl.textContent = '';
-          equipEl.textContent = '';
+          bossEl.textContent = '';
         }
       } else {
         el.classList.remove('filled');
@@ -270,7 +307,7 @@ export class ShadowUI {
         countEl.textContent = '';
         hpEl.className = 'soul-slot-hp';
         rankEl.textContent = '';
-        equipEl.textContent = '';
+        bossEl.textContent = '';
       }
     }
   }

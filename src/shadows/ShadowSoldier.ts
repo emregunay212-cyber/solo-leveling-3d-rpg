@@ -6,10 +6,11 @@ import { Scene } from '@babylonjs/core/scene';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { Ray } from '@babylonjs/core/Culling/ray';
 import { ShadowAI } from './ShadowAI';
+import type { ShadowCombatMode } from './ShadowAI';
 import { ShadowSkillRunner } from './ShadowSkillRunner';
 import { SHADOW, ENEMY_VISUAL } from '../config/GameConfig';
 import { calculateShadowStats } from './ShadowStatCalculator';
-import type { ShadowProfile, ShadowFinalStats } from './ShadowEnhancementTypes';
+import type { ShadowProfile, ShadowFinalStats, PlayerStats } from './ShadowEnhancementTypes';
 import type { DamageNumbers } from '../combat/DamageNumbers';
 import type { EnemyDef } from '../enemies/Enemy';
 import type { Enemy } from '../enemies/Enemy';
@@ -18,6 +19,7 @@ import type { GameContext } from '../core/GameContext';
 /**
  * Golge asker entity.
  * Olen dusmanin golgesi — oyuncuyu takip eder, dusmanlara saldirir.
+ * Statlar oyuncu statlarindan yuzde kopyalanir.
  */
 export class ShadowSoldier {
   private static nextId = 0;
@@ -43,14 +45,20 @@ export class ShadowSoldier {
   public finalStats: ShadowFinalStats | null = null;
   private skillRunner: ShadowSkillRunner | null = null;
 
-  constructor(scene: Scene, spawnPos: Vector3, sourceDef: EnemyDef, profile?: ShadowProfile) {
+  constructor(
+    scene: Scene,
+    spawnPos: Vector3,
+    sourceDef: EnemyDef,
+    playerStats: PlayerStats,
+    profile?: ShadowProfile,
+  ) {
     this.scene = scene;
     this.def = sourceDef;
     this.id = ShadowSoldier.nextId++;
     this.profile = profile ?? null;
 
-    // Stat hesaplama: profil varsa calculateShadowStats kullan, yoksa eski carpanlar
-    const stats = calculateShadowStats(sourceDef, this.profile);
+    // Stat hesaplama: oyuncu statlarindan yuzde kopyalama
+    const stats = calculateShadowStats(sourceDef, this.profile, playerStats);
     this.finalStats = stats;
     this.maxHp = stats.maxHp;
     this.damage = stats.damage;
@@ -109,9 +117,10 @@ export class ShadowSoldier {
       this.finalStats?.patrolSpeed,
     );
 
-    // Yetenek sistemi — profilde ogrenmis skill varsa runner olustur
-    if (this.profile && this.profile.learnedSkillIds.length > 0) {
-      this.skillRunner = new ShadowSkillRunner(this.profile.learnedSkillIds);
+    // Yetenek sistemi — profilden veya kaynak dusmanin sabit yeteneklerinden
+    const skillIds = this.profile?.shadowSkillIds ?? sourceDef.shadowSkillIds ?? [];
+    if (skillIds.length > 0) {
+      this.skillRunner = new ShadowSkillRunner(skillIds);
     }
   }
 
@@ -124,7 +133,7 @@ export class ShadowSoldier {
     if (this.skillRunner) {
       this.skillRunner.update(dt);
 
-      // Periyodik iyilesme (Dark Regen)
+      // Periyodik iyilesme
       const periodicHeal = this.skillRunner.getPeriodicHeal(this.maxHp);
       if (periodicHeal > 0 && this.hp < this.maxHp) {
         this.hp = Math.min(this.maxHp, this.hp + periodicHeal);
@@ -222,6 +231,11 @@ export class ShadowSoldier {
     this.damageNumbers = dn;
   }
 
+  /** Savas modunu AI'a aktar */
+  public setMode(mode: ShadowCombatMode): void {
+    this.ai.setMode(mode);
+  }
+
   /** Secim gorseli — seciliyken parlak mor kenar */
   public setSelected(selected: boolean): void {
     this.isSelected = selected;
@@ -246,16 +260,14 @@ export class ShadowSoldier {
 
     // Savunma: profil bazli defense ve blockChance uygula
     if (this.finalStats) {
-      // Savunmayi dusmanin hasarindan cikar (minimum 1 hasar)
       finalDamage = Math.max(1, finalDamage - this.finalStats.defense);
 
-      // Block sansi: basarili olursa kalan hasari yarilat
       if (this.finalStats.blockChance > 0 && Math.random() < this.finalStats.blockChance) {
         finalDamage = Math.max(1, Math.round(finalDamage * 0.5));
       }
     }
 
-    // Skill bazli hasar azaltma (Iron Will vb.)
+    // Skill bazli hasar azaltma
     if (this.skillRunner) {
       finalDamage = this.skillRunner.onTakeDamage(finalDamage);
     }

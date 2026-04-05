@@ -1,23 +1,21 @@
 /**
  * Golge Yonetim Paneli
- * Envanter, craft, dukkan ve yetenek kitaplari tab'lari.
+ * Golge listesi, detay ve oyuncu yetenek kitaplari.
+ * Ekipman, craft ve dukkan panelleri kaldirildi.
  * Tab key veya soul slot tiklama ile acilir.
  */
 
 import type { ShadowProfileManager } from '../shadows/ShadowProfileManager';
 import type { ShadowInventory } from '../systems/ShadowInventory';
-import type { ShadowProfile, EquipmentSlot } from '../shadows/ShadowEnhancementTypes';
+import type { ShadowProfile } from '../shadows/ShadowEnhancementTypes';
+import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
 import type { EnemyDef } from '../enemies/Enemy';
-import { EQUIPMENT_DEFS } from '../data/shadowEquipment';
-import { SKILL_BOOK_DEFS } from '../data/shadowSkillBooks';
+import { PLAYER_SKILL_BOOK_DEFS, ENEMY_SKILL_DEFS } from '../data/shadowSkillBooks';
 import { SHADOW_ENHANCEMENT } from '../config/GameConfig';
 import { calculateShadowStats } from '../shadows/ShadowStatCalculator';
 
-type TabId = 'inventory' | 'craft' | 'shop' | 'books';
+type TabId = 'detail' | 'shop' | 'books';
 
-const RARITY_COLORS: Record<string, string> = {
-  common: '#aaa', uncommon: '#4ade80', rare: '#60a5fa', epic: '#a855f7', legendary: '#f59e0b',
-};
 const RANK_COLORS: Record<string, string> = {
   soldier: '#aaa', knight: '#4ade80', elite: '#60a5fa', commander: '#f59e0b',
 };
@@ -25,8 +23,9 @@ const RANK_COLORS: Record<string, string> = {
 export class ShadowManageUI {
   private container: HTMLDivElement;
   private visible = false;
-  private activeTab: TabId = 'inventory';
+  private activeTab: TabId = 'detail';
   private selectedUid: number | null = null;
+  private playerStats: PlayerStats = { str: 5, vit: 5, agi: 5, int: 5 };
 
   private profileManager: ShadowProfileManager;
   private inventory: ShadowInventory;
@@ -70,6 +69,10 @@ export class ShadowManageUI {
   public selectShadow(uid: number): void {
     this.selectedUid = uid;
     if (this.visible) this.refresh();
+  }
+
+  public setPlayerStats(stats: PlayerStats): void {
+    this.playerStats = stats;
   }
 
   public refresh(): void {
@@ -123,7 +126,6 @@ export class ShadowManageUI {
       .smu-tab:hover { color:#c084fc; background:rgba(120,60,200,0.08); }
       .smu-tab.active { color:#c084fc; background:rgba(120,60,200,0.15);
         border-top:2px solid #a855f7; }
-      /* Shadow list items */
       .smu-shadow-item {
         padding:6px 8px; cursor:pointer; border-radius:4px; margin-bottom:2px;
         color:#e0d4fc; font-size:11px; transition:background 0.1s;
@@ -131,26 +133,15 @@ export class ShadowManageUI {
       .smu-shadow-item:hover { background:rgba(120,60,200,0.12); }
       .smu-shadow-item.sel { background:rgba(168,85,247,0.2); border-left:2px solid #a855f7; }
       .smu-shadow-rank { font-size:9px; font-weight:700; margin-right:4px; }
+      .smu-shadow-boss { font-size:8px; color:#f59e0b; margin-right:3px; }
       .smu-group-label { color:rgba(192,132,252,0.4); font-size:9px; font-weight:700;
         letter-spacing:1.5px; margin:8px 0 4px; text-transform:uppercase; }
-      /* Right panel sections */
       .smu-section { margin-bottom:12px; }
       .smu-section-title { color:rgba(192,132,252,0.6); font-size:10px; font-weight:700;
         letter-spacing:1.5px; margin-bottom:4px; text-transform:uppercase; }
       .smu-stat-row { display:flex; justify-content:space-between; color:#e0d4fc;
         font-size:12px; padding:2px 0; }
       .smu-stat-val { color:#c084fc; font-weight:700; }
-      /* Equipment slots */
-      .smu-equip-slot {
-        display:flex; align-items:center; justify-content:space-between;
-        padding:5px 8px; background:rgba(20,8,40,0.8);
-        border:1px solid rgba(100,40,160,0.2); border-radius:4px;
-        margin-bottom:4px; cursor:pointer; transition:border-color 0.15s;
-      }
-      .smu-equip-slot:hover { border-color:rgba(168,85,247,0.5); }
-      .smu-equip-name { color:#e0d4fc; font-size:11px; }
-      .smu-equip-empty { color:rgba(255,255,255,0.25); font-size:11px; font-style:italic; }
-      /* Grid items (shop/craft/books) */
       .smu-grid { display:flex; flex-wrap:wrap; gap:6px; }
       .smu-card {
         width:180px; padding:8px; background:rgba(20,8,40,0.8);
@@ -169,6 +160,15 @@ export class ShadowManageUI {
       .smu-empty { color:rgba(255,255,255,0.3); font-size:12px; font-style:italic; padding:16px; }
       .smu-skill-item { display:flex; align-items:center; gap:6px; padding:3px 0; }
       .smu-skill-name { color:#c084fc; font-size:11px; font-weight:600; }
+      .smu-nickname { cursor:pointer; transition:color 0.15s; }
+      .smu-nickname:hover { color:#c084fc; text-decoration:underline; text-decoration-style:dashed; }
+      .smu-nickname-input {
+        background:rgba(20,8,40,0.9); border:1px solid rgba(168,85,247,0.5);
+        border-radius:3px; color:#e0d4fc; font-size:14px; font-weight:700;
+        font-family:'Rajdhani','Segoe UI',sans-serif; padding:2px 6px;
+        outline:none; width:160px;
+      }
+      .smu-nickname-input:focus { border-color:#c084fc; box-shadow:0 0 6px rgba(192,132,252,0.3); }
     </style>
     <div class="smu-overlay" id="smu-overlay"></div>
     <div class="smu-modal">
@@ -182,8 +182,7 @@ export class ShadowManageUI {
         <div class="smu-right" id="smu-right"></div>
       </div>
       <div class="smu-tabs">
-        <div class="smu-tab active" data-tab="inventory">ENVANTER</div>
-        <div class="smu-tab" data-tab="craft">CRAFT</div>
+        <div class="smu-tab active" data-tab="detail">DETAY</div>
         <div class="smu-tab" data-tab="shop">DUKKAN</div>
         <div class="smu-tab" data-tab="books">KITAPLAR</div>
       </div>
@@ -239,16 +238,15 @@ export class ShadowManageUI {
       for (const p of list) {
         const sel = p.uid === this.selectedUid ? ' sel' : '';
         const rc = RANK_COLORS[p.rank] ?? '#aaa';
-        const eqCount = [p.equipment.weapon, p.equipment.shield, p.equipment.armor].filter(Boolean).length;
+        const bossIcon = p.isBoss ? '<span class="smu-shadow-boss">&#9733;</span>' : '';
+        const rankLabel = p.isBoss ? `<span class="smu-shadow-rank" style="color:${rc}">[${p.rank[0].toUpperCase()}]</span>` : '';
         html += `<div class="smu-shadow-item${sel}" data-uid="${p.uid}">
-          <span class="smu-shadow-rank" style="color:${rc}">[${p.rank[0].toUpperCase()}]</span>
-          ${p.nickname} ${eqCount > 0 ? `<span style="color:#f59e0b;font-size:9px">+${eqCount}</span>` : ''}
+          ${bossIcon}${rankLabel}${p.nickname}
         </div>`;
       }
     }
     left.innerHTML = html;
 
-    // Bind click
     left.querySelectorAll('.smu-shadow-item').forEach(el => {
       el.addEventListener('click', () => {
         const uid = parseInt((el as HTMLElement).dataset['uid'] ?? '0', 10);
@@ -262,16 +260,65 @@ export class ShadowManageUI {
 
   private renderRightPanel(): void {
     switch (this.activeTab) {
-      case 'inventory': this.renderInventoryTab(); break;
-      case 'craft': this.renderCraftTab(); break;
+      case 'detail': this.renderDetailTab(); break;
       case 'shop': this.renderShopTab(); break;
       case 'books': this.renderBooksTab(); break;
     }
   }
 
-  // ─── INVENTORY TAB (shadow detail + equip) ───
+  // ─── NICKNAME EDITING ───
 
-  private renderInventoryTab(): void {
+  private startNicknameEdit(nameEl: HTMLSpanElement, uid: number): void {
+    const currentName = nameEl.textContent ?? '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'smu-nickname-input';
+    input.value = currentName;
+    input.maxLength = 20;
+
+    const parent = nameEl.parentElement;
+    if (!parent) return;
+    parent.replaceChild(input, nameEl);
+    input.focus();
+    input.select();
+
+    let saved = false;
+
+    const saveNickname = (): void => {
+      if (saved) return;
+      saved = true;
+      const trimmed = input.value.trim();
+      if (trimmed.length > 0 && trimmed !== currentName) {
+        this.profileManager.setNickname(uid, trimmed);
+      }
+      this.refresh();
+    };
+
+    const cancelEdit = (): void => {
+      if (saved) return;
+      saved = true;
+      this.refresh();
+    };
+
+    input.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveNickname();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelEdit();
+      }
+      e.stopPropagation();
+    });
+
+    input.addEventListener('blur', () => {
+      saveNickname();
+    });
+  }
+
+  // ─── DETAIL TAB (shadow detail + intrinsic skills) ───
+
+  private renderDetailTab(): void {
     const right = this.container.querySelector('#smu-right') as HTMLDivElement;
     const profile = this.selectedUid !== null ? this.profileManager.getProfile(this.selectedUid) : null;
 
@@ -281,16 +328,24 @@ export class ShadowManageUI {
     }
 
     const enemyDef = this.getEnemyDef(profile.enemyDefId);
-    const stats = enemyDef ? calculateShadowStats(enemyDef, profile) : null;
+    const stats = enemyDef ? calculateShadowStats(enemyDef, profile, this.playerStats) : null;
     const rc = RANK_COLORS[profile.rank] ?? '#aaa';
     const rankName = SHADOW_ENHANCEMENT.ranks.find(r => r.rank === profile.rank)?.name ?? profile.rank;
+    const typeLabel = profile.isBoss ? 'BOSS' : 'Normal';
+    const typeColor = profile.isBoss ? '#f59e0b' : '#aaa';
 
     let html = `
     <div class="smu-section">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="color:#e0d4fc;font-size:14px;font-weight:700">${profile.nickname}</span>
-        <span style="color:${rc};font-size:11px;font-weight:700">${rankName}</span>
-      </div>
+        <span class="smu-nickname" id="smu-nickname" style="color:#e0d4fc;font-size:14px;font-weight:700" title="Isim degistirmek icin tikla">${profile.nickname}</span>
+        <span style="color:${typeColor};font-size:11px;font-weight:700">${typeLabel}</span>
+      </div>`;
+
+    if (profile.isBoss) {
+      html += `<div class="smu-stat-row"><span>Rutbe</span><span class="smu-stat-val" style="color:${rc}">${rankName}</span></div>`;
+    }
+
+    html += `
       <div class="smu-stat-row"><span>Oldurmeler</span><span class="smu-stat-val">${profile.kills}</span></div>
       <div class="smu-stat-row"><span>HP</span><span class="smu-stat-val">${Math.round(profile.hpPercent * 100)}%</span></div>`;
 
@@ -299,56 +354,17 @@ export class ShadowManageUI {
       <div class="smu-stat-row"><span>Maks HP</span><span class="smu-stat-val">${stats.maxHp}</span></div>
       <div class="smu-stat-row"><span>Hasar</span><span class="smu-stat-val">${stats.damage}</span></div>
       <div class="smu-stat-row"><span>Savunma</span><span class="smu-stat-val">${stats.defense}</span></div>
-      <div class="smu-stat-row"><span>Blok</span><span class="smu-stat-val">${(stats.blockChance * 100).toFixed(0)}%</span></div>`;
+      <div class="smu-stat-row"><span>Saldiri Hizi</span><span class="smu-stat-val">${stats.attackCooldown.toFixed(2)}s</span></div>`;
     }
     html += '</div>';
 
-    // Equipment slots
-    html += '<div class="smu-section"><div class="smu-section-title">EKIPMAN</div>';
-    const slots: EquipmentSlot[] = ['weapon', 'shield', 'armor'];
-    const slotLabels: Record<EquipmentSlot, string> = { weapon: 'Silah', shield: 'Kalkan', armor: 'Zirh' };
-    for (const slot of slots) {
-      const itemId = profile.equipment[slot];
-      if (itemId) {
-        const def = EQUIPMENT_DEFS[itemId];
-        const rc2 = def ? RARITY_COLORS[def.rarity] ?? '#aaa' : '#aaa';
-        html += `<div class="smu-equip-slot" data-action="unequip" data-slot="${slot}">
-          <span class="smu-equip-name" style="color:${rc2}">${def?.name ?? itemId}</span>
-          <span class="smu-btn">Cikar</span>
-        </div>`;
-      } else {
-        html += `<div class="smu-equip-slot" data-action="equiplist" data-slot="${slot}">
-          <span class="smu-equip-empty">${slotLabels[slot]} — Bos</span>
-          <span class="smu-btn">Kus</span>
-        </div>`;
-      }
-    }
-    html += '</div>';
-
-    // Available equipment from inventory for empty slots
-    const invEquip = this.inventory.getEquipmentItems();
-    if (invEquip.length > 0) {
-      html += '<div class="smu-section"><div class="smu-section-title">ENVANTERDEKI EKIPMAN</div><div class="smu-grid">';
-      for (const item of invEquip) {
-        const def = EQUIPMENT_DEFS[item.id];
-        if (!def) continue;
-        const rc2 = RARITY_COLORS[def.rarity] ?? '#aaa';
-        html += `<div class="smu-card">
-          <div class="smu-card-name" style="color:${rc2}">${def.name} x${item.count}</div>
-          <div class="smu-card-desc">${def.description}</div>
-          <span class="smu-btn" data-action="equip" data-item="${item.id}" data-slot="${def.slot}">Kus</span>
-        </div>`;
-      }
-      html += '</div></div>';
-    }
-
-    // Learned skills
-    html += '<div class="smu-section"><div class="smu-section-title">YETENEKLER</div>';
-    if (profile.learnedSkillIds.length === 0) {
-      html += '<div class="smu-empty">Ogrenilmis yetenek yok</div>';
+    // Intrinsic skills from enemy definition
+    html += '<div class="smu-section"><div class="smu-section-title">ICERIK YETENEKLER</div>';
+    if (profile.shadowSkillIds.length === 0) {
+      html += '<div class="smu-empty">Yetenek yok</div>';
     } else {
-      for (const sid of profile.learnedSkillIds) {
-        const sd = SKILL_BOOK_DEFS[sid];
+      for (const sid of profile.shadowSkillIds) {
+        const sd = ENEMY_SKILL_DEFS[sid];
         html += `<div class="smu-skill-item">
           <span class="smu-skill-name">${sd?.name ?? sid}</span>
           <span style="color:rgba(255,255,255,0.3);font-size:10px">${sd?.description ?? ''}</span>
@@ -358,72 +374,15 @@ export class ShadowManageUI {
     html += '</div>';
 
     right.innerHTML = html;
-    this.bindInventoryActions(right);
-  }
 
-  private bindInventoryActions(container: HTMLElement): void {
-    container.querySelectorAll('[data-action]').forEach(el => {
-      el.addEventListener('click', () => {
-        const action = (el as HTMLElement).dataset['action'];
-        const slot = (el as HTMLElement).dataset['slot'] as EquipmentSlot | undefined;
-        const itemId = (el as HTMLElement).dataset['item'];
-
-        if (!this.selectedUid) return;
-
-        if (action === 'unequip' && slot) {
-          const result = this.profileManager.unequip(this.selectedUid, slot);
-          if (result) this.inventory.addItem(result.itemId, 'equipment');
-          this.refresh();
-        } else if (action === 'equip' && itemId && slot) {
-          if (this.inventory.removeItem(itemId)) {
-            // Unequip existing first
-            const profile = this.profileManager.getProfile(this.selectedUid);
-            if (profile?.equipment[slot]) {
-              const prev = this.profileManager.unequip(this.selectedUid, slot);
-              if (prev) this.inventory.addItem(prev.itemId, 'equipment');
-            }
-            this.profileManager.equip(this.selectedUid, itemId, slot);
-          }
-          this.refresh();
-        }
+    // Nickname editing
+    const nicknameEl = right.querySelector('#smu-nickname') as HTMLSpanElement | null;
+    if (nicknameEl && this.selectedUid !== null) {
+      const uid = this.selectedUid;
+      nicknameEl.addEventListener('click', () => {
+        this.startNicknameEdit(nicknameEl, uid);
       });
-    });
-  }
-
-  // ─── CRAFT TAB ───
-
-  private renderCraftTab(): void {
-    const right = this.container.querySelector('#smu-right') as HTMLDivElement;
-    const items = this.inventory.getEquipmentItems();
-
-    if (items.length === 0) {
-      right.innerHTML = '<div class="smu-empty">Craft icin envanterde ekipman yok</div>';
-      return;
     }
-
-    let html = '<div class="smu-section"><div class="smu-section-title">CRAFT (3 ayni = 1 ust nadirlik)</div><div class="smu-grid">';
-    for (const item of items) {
-      const def = EQUIPMENT_DEFS[item.id];
-      if (!def) continue;
-      if (def.rarity === 'legendary') continue; // Can't upgrade legendary
-      const canCraft = item.count >= SHADOW_ENHANCEMENT.craftRatio;
-      const rc2 = RARITY_COLORS[def.rarity] ?? '#aaa';
-      html += `<div class="smu-card">
-        <div class="smu-card-name" style="color:${rc2}">${def.name} x${item.count}</div>
-        <div class="smu-card-desc">${SHADOW_ENHANCEMENT.craftRatio} adet → 1 ust nadirlik</div>
-        <span class="smu-btn${canCraft ? '' : ' disabled'}" data-craft="${item.id}">${canCraft ? 'Craft' : 'Yetersiz'}</span>
-      </div>`;
-    }
-    html += '</div></div>';
-    right.innerHTML = html;
-
-    right.querySelectorAll('[data-craft]').forEach(el => {
-      el.addEventListener('click', () => {
-        const id = (el as HTMLElement).dataset['craft']!;
-        this.inventory.craft(id);
-        this.refresh();
-      });
-    });
   }
 
   // ─── SHOP TAB ───
@@ -438,16 +397,13 @@ export class ShadowManageUI {
     }
 
     const gold = this.inventory.getGold();
-    let html = '<div class="smu-section"><div class="smu-section-title">DUKKAN</div><div class="smu-grid">';
+    let html = '<div class="smu-section"><div class="smu-section-title">OYUNCU YETENEK KITAPLARI</div><div class="smu-grid">';
     for (const item of shopItems) {
-      const equipDef = EQUIPMENT_DEFS[item.id];
-      const skillDef = SKILL_BOOK_DEFS[item.id];
-      const desc = equipDef?.description ?? skillDef?.description ?? '';
-      const rarity = equipDef?.rarity;
-      const rc2 = rarity ? RARITY_COLORS[rarity] ?? '#e0d4fc' : '#c084fc';
+      const skillDef = PLAYER_SKILL_BOOK_DEFS[item.id];
+      const desc = skillDef?.description ?? '';
       const canBuy = gold >= item.price;
       html += `<div class="smu-card">
-        <div class="smu-card-name" style="color:${rc2}">${item.name}</div>
+        <div class="smu-card-name" style="color:#c084fc">${item.name}</div>
         <div class="smu-card-desc">${desc}</div>
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="color:#f59e0b;font-size:11px;font-weight:700">${item.price} G</span>
@@ -467,47 +423,29 @@ export class ShadowManageUI {
     });
   }
 
-  // ─── BOOKS TAB ───
+  // ─── BOOKS TAB (player skill books from inventory) ───
 
   private renderBooksTab(): void {
     const right = this.container.querySelector('#smu-right') as HTMLDivElement;
     const books = this.inventory.getSkillBookItems();
-    const profile = this.selectedUid !== null ? this.profileManager.getProfile(this.selectedUid) : null;
 
-    let html = '<div class="smu-section"><div class="smu-section-title">YETENEK KITAPLARI</div>';
+    let html = '<div class="smu-section"><div class="smu-section-title">OYUNCU YETENEK KITAPLARI (Envanter)</div>';
 
     if (books.length === 0) {
       html += '<div class="smu-empty">Envanterde yetenek kitabi yok</div>';
     } else {
       html += '<div class="smu-grid">';
       for (const book of books) {
-        const def = SKILL_BOOK_DEFS[book.id];
+        const def = PLAYER_SKILL_BOOK_DEFS[book.id];
         if (!def) continue;
-        const alreadyLearned = profile?.learnedSkillIds.includes(book.id) ?? false;
-        const slotsFull = (profile?.learnedSkillIds.length ?? 0) >= SHADOW_ENHANCEMENT.maxSkillSlots;
-        const canTeach = profile !== null && !alreadyLearned && !slotsFull;
         html += `<div class="smu-card">
           <div class="smu-card-name" style="color:#c084fc">${def.name} x${book.count}</div>
           <div class="smu-card-desc">${def.description}</div>
-          <span class="smu-btn${canTeach ? '' : ' disabled'}" data-teach="${book.id}">
-            ${alreadyLearned ? 'Zaten Biliyor' : slotsFull ? 'Slot Dolu' : profile ? 'Ogret' : 'Golge Sec'}
-          </span>
         </div>`;
       }
       html += '</div>';
     }
     html += '</div>';
     right.innerHTML = html;
-
-    right.querySelectorAll('[data-teach]').forEach(el => {
-      el.addEventListener('click', () => {
-        if (!this.selectedUid) return;
-        const id = (el as HTMLElement).dataset['teach']!;
-        if (this.inventory.removeItem(id)) {
-          this.profileManager.learnSkill(this.selectedUid, id);
-        }
-        this.refresh();
-      });
-    });
   }
 }

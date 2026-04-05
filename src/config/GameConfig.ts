@@ -284,27 +284,15 @@ export const SHADOW = {
 
 // ─── GOLGE GELISTIRME ───
 export const SHADOW_ENHANCEMENT = {
-  maxSkillSlots: 3,
-  dropChanceMultiplier: 1.0,
-  equipmentStatCaps: {
-    bonusDamagePercent: 0.5,
-    bonusHpPercent: 0.5,
-    bonusBlockChance: 0.3,
-  },
+  normalStatPercent: 0.15,    // normal golgeler oyuncu statlarinin %15'ini kopyalar
+  bossBaseStatPercent: 0.25,  // boss golgelerin baz yuzdesi %25
   ranks: [
-    { rank: 'soldier', name: 'Asker', requiredKills: 0, bonusHpPercent: 0, bonusDamagePercent: 0, bonusSpeedPercent: 0, bonusCooldownReduction: 0 },
-    { rank: 'knight', name: 'Sovalye', requiredKills: 15, bonusHpPercent: 0.05, bonusDamagePercent: 0.05, bonusSpeedPercent: 0, bonusCooldownReduction: 0 },
-    { rank: 'elite', name: 'Elit', requiredKills: 50, bonusHpPercent: 0.12, bonusDamagePercent: 0.12, bonusSpeedPercent: 0.05, bonusCooldownReduction: 0 },
-    { rank: 'commander', name: 'Komutan', requiredKills: 150, bonusHpPercent: 0.20, bonusDamagePercent: 0.20, bonusSpeedPercent: 0.10, bonusCooldownReduction: 0.10 },
+    { rank: 'soldier', name: 'Asker', requiredKills: 0, statPercent: 0.25 },
+    { rank: 'knight', name: 'Sovalye', requiredKills: 15, statPercent: 0.30 },
+    { rank: 'elite', name: 'Elit', requiredKills: 50, statPercent: 0.35 },
+    { rank: 'commander', name: 'Komutan', requiredKills: 150, statPercent: 0.40 },
   ],
-  craftRatio: 3,  // 3 ayni nadirlik → 1 ust nadirlik
-} as const;
-
-// ─── DUKKAN ───
-export const SHOP = {
-  // buyPrice > 0 olan esyalar dukkanda gorunur
-  // Rare+ satin alinamaz (buyPrice = 0)
-  sellPriceMultiplier: 0.4,  // alis fiyatinin %40'ina sat
+  craftRatio: 3,
 } as const;
 
 // ─── UI ───

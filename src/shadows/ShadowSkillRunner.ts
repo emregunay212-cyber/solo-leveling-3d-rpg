@@ -1,17 +1,17 @@
 /**
  * Golge Yetenek Calistirici
- * Her ShadowSoldier icin ogrenmis oldugu yetenekleri calisma zamaninda yurutur.
+ * Her ShadowSoldier icin dusman-icerik yetenekleri calisma zamaninda yurutur.
  * Cooldown, buff ve tetikleme mantigi burada yonetilir.
  */
 
 import { SKILL_BOOK_DEFS } from '../data/shadowSkillBooks';
-import type { ShadowSkillDef, EquipmentStats } from './ShadowEnhancementTypes';
+import type { ShadowSkillDef, SkillStatBuff } from './ShadowEnhancementTypes';
 import type { Enemy } from '../enemies/Enemy';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 
 interface ActiveBuff {
   readonly skillId: string;
-  readonly stats: Partial<EquipmentStats>;
+  readonly stats: Partial<SkillStatBuff>;
   remaining: number; // saniye
 }
 
@@ -30,8 +30,8 @@ export class ShadowSkillRunner {
   private readonly cooldowns = new Map<string, number>();
   private activeBuffs: ActiveBuff[] = [];
 
-  constructor(learnedSkillIds: readonly string[]) {
-    for (const id of learnedSkillIds) {
+  constructor(skillIds: readonly string[]) {
+    for (const id of skillIds) {
       const def = SKILL_BOOK_DEFS[id];
       if (def) {
         this.skills.push(def);
@@ -72,11 +72,18 @@ export class ShadowSkillRunner {
 
       const { effect } = skill;
 
-      // Shadow Cleave: AoE hasar
+      // AoE saldiri (Shadow Cleave, Hellfire vb.)
       if (effect.aoeRadius && effect.damageMultiplier) {
         bonusDamage += baseDamage * (effect.damageMultiplier - 1);
         aoeRadius = Math.max(aoeRadius, effect.aoeRadius);
         this.cooldowns.set(skill.id, skill.cooldown);
+      }
+      // Duz hasar carpani (Heavy Strike, Pack Bonus vb.)
+      else if (effect.damageMultiplier && effect.damageMultiplier > 1) {
+        bonusDamage += baseDamage * (effect.damageMultiplier - 1);
+        if (skill.cooldown > 0) {
+          this.cooldowns.set(skill.id, skill.cooldown);
+        }
       }
     }
 
@@ -93,11 +100,16 @@ export class ShadowSkillRunner {
     for (const skill of this.skills) {
       if (skill.trigger !== 'onTakeDamage') continue;
 
-      // Iron Will: bloklama sansi ile hasari yarilat
+      // Bloklama sansi ile hasari yarilat (Shield Block, Iron Will vb.)
       if (skill.effect.statBuff?.bonusBlockChance) {
         if (Math.random() < skill.effect.statBuff.bonusBlockChance) {
           modified = Math.max(1, Math.round(modified * 0.5));
         }
+      }
+
+      // Savunma bonusu (Tough Skin vb.)
+      if (skill.effect.statBuff?.bonusDefense) {
+        modified = Math.max(1, modified - skill.effect.statBuff.bonusDefense);
       }
     }
 
@@ -116,9 +128,9 @@ export class ShadowSkillRunner {
       if (skill.trigger !== 'onKill') continue;
       if (!this.isReady(skill.id)) continue;
 
-      // Frenzy: gecici hasar buff'i (damageMultiplier -> bonusDamagePercent)
+      // Gecici hasar buff'i (damageMultiplier -> bonusDamagePercent)
       if (skill.effect.damageMultiplier && skill.effect.durationSeconds) {
-        const bonusPercent = skill.effect.damageMultiplier - 1; // 1.20 -> 0.20
+        const bonusPercent = skill.effect.damageMultiplier - 1;
         this.activeBuffs.push({
           skillId: skill.id,
           stats: { bonusDamagePercent: bonusPercent },
@@ -147,18 +159,18 @@ export class ShadowSkillRunner {
   getLifestealHeal(damageDealt: number): number {
     let heal = 0;
     for (const skill of this.skills) {
-      if (skill.trigger === 'onAttack' && skill.effect.healPercent) {
+      if (skill.trigger === 'onAttack' && skill.effect.healPercent && skill.effect.healPercent > 0) {
         heal += damageDealt * skill.effect.healPercent;
       }
     }
     return Math.round(heal);
   }
 
-  /** Periyodik iyilesme miktari (Dark Regen) — sadece hazir olan skilleri hesaplar */
+  /** Periyodik iyilesme miktari — sadece hazir olan skilleri hesaplar */
   getPeriodicHeal(maxHp: number): number {
     let heal = 0;
     for (const skill of this.skills) {
-      if (skill.trigger === 'periodic' && skill.effect.healPercent && this.isReady(skill.id)) {
+      if (skill.trigger === 'periodic' && skill.effect.healPercent && skill.effect.healPercent > 0 && this.isReady(skill.id)) {
         heal += maxHp * skill.effect.healPercent;
         this.cooldowns.set(skill.id, skill.cooldown);
       }

@@ -11,6 +11,8 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     color: new Color3(0.2, 0.5, 0.15),
     scale: 0.8,
     level: 1,
+    isBoss: false,
+    shadowSkillIds: ['enemy_fast_attack'],
   },
   wolf: {
     name: 'Kurt',
@@ -21,6 +23,8 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     color: new Color3(0.4, 0.35, 0.3),
     scale: 0.85,
     level: 3,
+    isBoss: false,
+    shadowSkillIds: ['enemy_pack_bonus'],
   },
   orc: {
     name: 'Ork',
@@ -31,6 +35,8 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     color: new Color3(0.3, 0.45, 0.2),
     scale: 1.1,
     level: 5,
+    isBoss: false,
+    shadowSkillIds: ['enemy_heavy_strike', 'enemy_tough_skin'],
   },
   skeleton: {
     name: 'Iskelet',
@@ -41,6 +47,8 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     color: new Color3(0.75, 0.72, 0.65),
     scale: 1.0,
     level: 4,
+    isBoss: false,
+    shadowSkillIds: ['enemy_poison_strike'],
   },
   darkKnight: {
     name: 'Kara Sovalye',
@@ -51,6 +59,8 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     color: new Color3(0.15, 0.1, 0.2),
     scale: 1.2,
     level: 8,
+    isBoss: true,
+    shadowSkillIds: ['enemy_shield_block', 'enemy_shadow_cleave'],
   },
   demon: {
     name: 'Seytan',
@@ -61,5 +71,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     color: new Color3(0.6, 0.1, 0.05),
     scale: 1.3,
     level: 12,
+    isBoss: true,
+    shadowSkillIds: ['enemy_lifesteal', 'enemy_hellfire'],
   },
 };

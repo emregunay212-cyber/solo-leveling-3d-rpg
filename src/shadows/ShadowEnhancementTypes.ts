@@ -1,36 +1,8 @@
 /**
  * Golge Gelistirme Sistemi - Tip Tanimlari
- * Ekipman, yetenek kitaplari, rutbe ve envanter tipleri.
+ * Yetenek kitaplari, rutbe ve envanter tipleri.
+ * Ekipman sistemi kaldirildi — golgeler oyuncu statlarindan yuzde kopyalar.
  */
-
-// ─── EKIPMAN ───
-
-export type EquipmentSlot = 'weapon' | 'shield' | 'armor';
-
-export type EquipmentRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-
-export interface EquipmentStats {
-  readonly bonusDamage?: number;
-  readonly bonusDamagePercent?: number;
-  readonly bonusDefense?: number;
-  readonly bonusBlockChance?: number;
-  readonly bonusHp?: number;
-  readonly bonusHpPercent?: number;
-  readonly bonusAttackSpeed?: number;
-  readonly bonusMoveSpeed?: number;
-}
-
-export interface EquipmentDef {
-  readonly id: string;
-  readonly name: string;
-  readonly slot: EquipmentSlot;
-  readonly rarity: EquipmentRarity;
-  readonly requiredLevel: number;
-  readonly stats: EquipmentStats;
-  readonly description: string;
-  readonly buyPrice: number;      // 0 = satin alinamaz
-  readonly sellPrice: number;
-}
 
 // ─── YETENEK KITAPLARI ───
 
@@ -43,12 +15,21 @@ export type ShadowSkillTrigger =
   | 'periodic'
   | 'manual';
 
+/** Stat buff tipleri — ekipman bagimsiz, skill efektleri icin */
+export interface SkillStatBuff {
+  readonly bonusDamagePercent?: number;
+  readonly bonusDefense?: number;
+  readonly bonusBlockChance?: number;
+  readonly bonusAttackSpeed?: number;
+  readonly bonusMoveSpeed?: number;
+}
+
 export interface ShadowSkillEffect {
   readonly damageMultiplier?: number;
   readonly healPercent?: number;
   readonly aoeRadius?: number;
   readonly durationSeconds?: number;
-  readonly statBuff?: Partial<EquipmentStats>;
+  readonly statBuff?: Partial<SkillStatBuff>;
   readonly forceTaunt?: boolean;
   readonly teleportBehind?: boolean;
 }
@@ -74,19 +55,10 @@ export interface ShadowRankDef {
   readonly rank: ShadowRank;
   readonly name: string;
   readonly requiredKills: number;
-  readonly bonusHpPercent: number;
-  readonly bonusDamagePercent: number;
-  readonly bonusSpeedPercent: number;
-  readonly bonusCooldownReduction: number;
+  readonly statPercent: number;
 }
 
 // ─── GOLGE PROFILI (kalici kimlik) ───
-
-export interface ShadowEquipment {
-  readonly weapon: string | null;
-  readonly shield: string | null;
-  readonly armor: string | null;
-}
 
 export interface ShadowProfile {
   readonly uid: number;
@@ -94,9 +66,18 @@ export interface ShadowProfile {
   readonly nickname: string;
   readonly rank: ShadowRank;
   readonly kills: number;
-  readonly equipment: ShadowEquipment;
-  readonly learnedSkillIds: readonly string[];
+  readonly isBoss: boolean;
+  readonly shadowSkillIds: readonly string[];
   readonly hpPercent: number;
+}
+
+// ─── OYUNCU STATLARI (golge stat hesaplamasi icin) ───
+
+export interface PlayerStats {
+  readonly str: number;
+  readonly vit: number;
+  readonly agi: number;
+  readonly int: number;
 }
 
 // ─── HESAPLANMIS NIHAI STATLAR ───
@@ -115,7 +96,7 @@ export interface ShadowFinalStats {
 
 export interface InventoryItem {
   readonly id: string;
-  readonly type: 'equipment' | 'skillbook';
+  readonly type: 'skillbook';
   readonly count: number;
 }
 
@@ -123,7 +104,7 @@ export interface InventoryItem {
 
 export interface DropEntry {
   readonly itemId: string;
-  readonly itemType: 'equipment' | 'skillbook';
+  readonly itemType: 'skillbook';
   readonly chance: number;   // 0-1 arasi olasilik
   readonly minLevel: number;
 }

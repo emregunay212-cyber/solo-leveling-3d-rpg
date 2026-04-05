@@ -1,9 +1,10 @@
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Scene } from '@babylonjs/core/scene';
 import { ShadowSoldier } from './ShadowSoldier';
+import type { ShadowCombatMode } from './ShadowAI';
 import { SHADOW } from '../config/GameConfig';
 import { eventBus } from '../core/EventBus';
-import type { ShadowProfile } from './ShadowEnhancementTypes';
+import type { ShadowProfile, PlayerStats } from './ShadowEnhancementTypes';
 import type { ShadowProfileManager } from './ShadowProfileManager';
 import type { DamageNumbers } from '../combat/DamageNumbers';
 import type { EnemyDef } from '../enemies/Enemy';
@@ -13,6 +14,7 @@ import type { GameContext } from '../core/GameContext';
 /**
  * Golge ordusu yoneticisi.
  * Golge cikarma, golge listesi, update ve dispose.
+ * Oyuncu statlari referansi tutulur ve golge stat hesaplamalarinda kullanilir.
  */
 /** Ruh stok slotu (1-4) */
 export interface SoulSlot {
@@ -27,6 +29,8 @@ export class ShadowArmy {
   private shadows: ShadowSoldier[] = [];
   private scene: Scene;
   private damageNumbers: DamageNumbers | null = null;
+  private armyMode: ShadowCombatMode = 'defense';
+  private playerStats: PlayerStats;
 
   // Ruh stok sistemi (1-2-3-4 slotlari)
   private soulSlots: SoulSlot[] = [
@@ -38,13 +42,41 @@ export class ShadowArmy {
   private stockHealAccum = 0;
   private profileManager: ShadowProfileManager | null = null;
 
-  constructor(scene: Scene, profileManager?: ShadowProfileManager) {
+  constructor(scene: Scene, playerStats: PlayerStats, profileManager?: ShadowProfileManager) {
     this.scene = scene;
+    this.playerStats = playerStats;
     this.profileManager = profileManager ?? null;
   }
 
   public setDamageNumbers(dn: DamageNumbers): void {
     this.damageNumbers = dn;
+  }
+
+  /** Oyuncu statlari degistiginde cagir — yeni golgeler guncel statlarla olusturulur */
+  public setPlayerStats(stats: PlayerStats): void {
+    this.playerStats = stats;
+  }
+
+  // ─── SAVAS MODU ───
+
+  public setMode(mode: ShadowCombatMode): void {
+    this.armyMode = mode;
+    for (const shadow of this.shadows) {
+      if (shadow.isAlive()) {
+        shadow.setMode(mode);
+      }
+    }
+    eventBus.emit('shadow:modeChanged', { mode });
+  }
+
+  public getMode(): ShadowCombatMode {
+    return this.armyMode;
+  }
+
+  public toggleMode(): ShadowCombatMode {
+    const newMode: ShadowCombatMode = this.armyMode === 'attack' ? 'defense' : 'attack';
+    this.setMode(newMode);
+    return newMode;
   }
 
   /** Golge cikarma denemesi — limit yok, bedeli MP/HP ile odenir */
@@ -61,20 +93,10 @@ export class ShadowArmy {
     // Seviye farkina gore sans ayarlama
     const levelDiff = sourceDef.level - playerLevel;
     if (levelDiff > 0) {
-      // Guclu dusman → sans duser (her seviye farki icin -%15)
       chance *= 1 / (1 + levelDiff * 0.15);
     } else if (levelDiff < 0) {
-      // Zayif dusman → sans artar (her seviye farki icin +%10, max %95)
       chance = Math.min(0.95, chance + Math.abs(levelDiff) * 0.10);
     }
-
-    // INT ile zayif dusmanlar neredeyse garanti, gucluler mumkun
-    // Ornek (INT 5, Lv1 oyuncu):
-    //   Goblin Lv1:  %60 + %1.5 = %61.5
-    //   Seytan Lv12: %61.5 * 1/(1+11*0.15) = %22.5
-    // Ornek (INT 50, Lv10 oyuncu):
-    //   Goblin Lv1:  min(%95, %75 + 9*%10) = %95
-    //   Seytan Lv12: %75 * 1/(1+2*0.15) = %57.7
 
     if (Math.random() > chance) {
       eventBus.emit('shadow:failed', { reason: 'chance_fail' });
@@ -83,11 +105,12 @@ export class ShadowArmy {
 
     // Profil olustur (profil yoneticisi varsa)
     const profile = this.profileManager
-      ? this.profileManager.createProfile(sourceDef.name)
+      ? this.profileManager.createProfile(sourceDef.name, sourceDef.isBoss, sourceDef.shadowSkillIds)
       : undefined;
 
-    // Golge olustur — profil varsa stat hesaplamasi profil uzerinden yapilir
-    const shadow = new ShadowSoldier(this.scene, position, sourceDef, profile);
+    // Golge olustur — playerStats ile stat hesaplamasi yapilir
+    const shadow = new ShadowSoldier(this.scene, position, sourceDef, this.playerStats, profile);
+    shadow.setMode(this.armyMode);
     if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
     this.shadows.push(shadow);
 
@@ -131,12 +154,6 @@ export class ShadowArmy {
 
   // ─── RUH STOK SISTEMI ───
 
-  /**
-   * Sahada yasayan bir golgeyi stok slotuna kaydet.
-   * Golge sahneden kaldirilir, slot'a eklenir.
-   * Ayni turden ise staklenebilir, farkli turse reddedilir.
-   * @returns true ise stoklandi
-   */
   public stockShadow(slotIndex: number, shadow: ShadowSoldier): boolean {
     if (slotIndex < 0 || slotIndex >= 4) return false;
     if (!shadow.isAlive()) return false;
@@ -144,12 +161,10 @@ export class ShadowArmy {
     const slot = this.soulSlots[slotIndex];
     const defName = shadow.def.name;
 
-    // Slot bos veya ayni tur → stokla
     if (slot.enemyDefId === null || slot.enemyDefId === defName) {
       slot.enemyDefId = defName;
       slot.enemyDef = shadow.def;
 
-      // Profil varsa profileManager uzerinden HP guncelle ve slot'a ekle
       const shadowProfile = shadow.getProfile();
       const hpPercent = shadow.hp / shadow.maxHp;
       if (shadowProfile && this.profileManager) {
@@ -157,35 +172,27 @@ export class ShadowArmy {
         slot.profiles.push({ ...shadowProfile, hpPercent });
       }
 
-      // HP yuzdesini kaydet (ShadowUI uyumlulugu)
       slot.hpPercents.push(hpPercent);
       slot.count = slot.hpPercents.length;
 
-      // Golgeyi sahneden kaldir
       shadow.takeDamage(999999);
       return true;
     }
 
-    // Farkli tur → reddedilir
     return false;
   }
 
-  /**
-   * Stoktan bir golge cagir (Alt + 1/2/3/4).
-   * Aktif golge sayisi max'tan azsa sahneye cikarir.
-   */
   public summonFromStock(
     slotIndex: number,
     position: Vector3,
-    playerLevel: number,
+    _playerLevel: number,
   ): boolean {
     if (slotIndex < 0 || slotIndex >= 4) return false;
 
     const slot = this.soulSlots[slotIndex];
     if (!slot.enemyDef || slot.count <= 0) return false;
 
-    // Stoktan bir azalt ve HP ile sahneye cikar
-    const def = slot.enemyDef!;
+    const def = slot.enemyDef;
     const hpPercent = slot.hpPercents.pop() ?? 1;
     const profile = slot.profiles.pop() ?? undefined;
     slot.count = slot.hpPercents.length;
@@ -196,11 +203,11 @@ export class ShadowArmy {
       slot.profiles = [];
     }
 
-    const shadow = new ShadowSoldier(this.scene, position, def, profile);
-    // Profili olmayan golgeler icin eski yontemle HP ayarla
+    const shadow = new ShadowSoldier(this.scene, position, def, this.playerStats, profile);
     if (!profile) {
       shadow.setHpPercent(hpPercent);
     }
+    shadow.setMode(this.armyMode);
     if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
     this.shadows.push(shadow);
     return true;
@@ -212,17 +219,11 @@ export class ShadowArmy {
 
   // ─── MANA DRAIN ───
 
-  /**
-   * Aktif golgelerin saniyede harcadigi toplam MP.
-   * Guclu golgeler daha cok, zayif golgeler daha az MP harcar.
-   * Oyuncu seviyesi arttikca drain azalir.
-   */
   public getManaDrainPerSecond(playerLevel: number): number {
     let total = 0;
     for (const shadow of this.shadows) {
       if (!shadow.isAlive()) continue;
       const enemyLv = shadow.def.level;
-      // Baz + dusman seviyesi bonusu - oyuncu seviyesi indirimi
       const drain = SHADOW.manaDrainBase
         + enemyLv * SHADOW.manaDrainPerEnemyLevel
         - playerLevel * SHADOW.manaDrainLevelReduction;
@@ -242,7 +243,6 @@ export class ShadowArmy {
 
   // ─── STOK IYILESME ───
 
-  /** Envanterdeki golgelerin HP'sini zamanla artir */
   public updateStockHealing(dt: number): void {
     this.stockHealAccum += dt;
     if (this.stockHealAccum < SHADOW.stockHealInterval) return;
@@ -254,7 +254,6 @@ export class ShadowArmy {
         const newHp = Math.min(1, slot.hpPercents[i] + SHADOW.stockHealPercent);
         slot.hpPercents[i] = newHp;
 
-        // Profil varsa profileManager uzerinden de guncelle
         if (i < slot.profiles.length && this.profileManager) {
           const p = slot.profiles[i];
           const updated = this.profileManager.updateHpPercent(p.uid, newHp);
@@ -266,7 +265,6 @@ export class ShadowArmy {
     }
   }
 
-  /** Slot'taki tum golgeler full HP mi? */
   public isSlotFullHp(slotIndex: number): boolean {
     const slot = this.soulSlots[slotIndex];
     if (!slot || slot.count <= 0) return false;

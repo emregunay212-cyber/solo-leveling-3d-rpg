@@ -1,12 +1,11 @@
 /**
  * Drop Sistemi
- * Dusman oldugunde drop tablosuna gore esya dusurur ve envantere ekler.
+ * Dusman oldugunde drop tablosuna gore yetenek kitabi dusurur ve envantere ekler.
  * EventBus'a dogrudan abone olmaz — TestScene tarafindan cagirilir.
  */
 
 import { eventBus } from '../core/EventBus';
 import { SHADOW_DROP_TABLES } from '../data/shadowDropTables';
-import { SHADOW_ENHANCEMENT } from '../config/GameConfig';
 import type { ShadowInventory } from './ShadowInventory';
 
 export class DropSystem {
@@ -17,7 +16,7 @@ export class DropSystem {
   }
 
   /**
-   * Dusman oldugunde cagirilir. Drop tablosundan esya dusurur.
+   * Dusman oldugunde cagirilir. Drop tablosundan yetenek kitabi dusurur.
    * enemyName: SHADOW_DROP_TABLES anahtarlariyla eslesir (ornegin 'goblin', 'wolf').
    * enemyLevel: dusmanin seviyesi — minLevel kontrolu icin.
    */
@@ -29,9 +28,8 @@ export class DropSystem {
       if (enemyLevel < entry.minLevel) continue;
 
       const roll = Math.random();
-      const adjustedChance = entry.chance * SHADOW_ENHANCEMENT.dropChanceMultiplier;
 
-      if (roll < adjustedChance) {
+      if (roll < entry.chance) {
         this.inventory.addItem(entry.itemId, entry.itemType);
         eventBus.emit('loot:drop', {
           itemId: entry.itemId,

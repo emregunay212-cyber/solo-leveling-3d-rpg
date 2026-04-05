@@ -1,75 +1,47 @@
 /**
  * Golge Drop Tablolari
- * Dusman turune gore esya ve yetenek kitabi dusurme olasiliklari.
+ * Dusman turune gore yetenek kitabi dusurme olasiliklari.
+ * Ekipman drop'lari kaldirildi — sadece oyuncu yetenek kitaplari duser.
  * chance: 0-1 arasi olasilik, minLevel: dusmanin minimum seviyesi.
  */
 
 import type { DropEntry } from '../shadows/ShadowEnhancementTypes';
 
-// ─── GOBLIN (lv1) — common agirlikli ───
+// ─── GOBLIN (lv1) — dusuk seviye kitaplar ───
 const goblinDrops: readonly DropEntry[] = [
-  { itemId: 'shadow_dagger',   itemType: 'equipment',  chance: 0.12, minLevel: 1 },
-  { itemId: 'shadow_buckler',  itemType: 'equipment',  chance: 0.12, minLevel: 1 },
-  { itemId: 'shadow_wraps',    itemType: 'equipment',  chance: 0.12, minLevel: 1 },
-  { itemId: 'book_dark_regen', itemType: 'skillbook',  chance: 0.04, minLevel: 1 },
-  { itemId: 'book_frenzy',     itemType: 'skillbook',  chance: 0.03, minLevel: 1 },
+  { itemId: 'book_shadow_blade_up', itemType: 'skillbook', chance: 0.06, minLevel: 1 },
+  { itemId: 'book_dark_regen',      itemType: 'skillbook', chance: 0.04, minLevel: 1 },
 ] as const;
 
-// ─── KURT / WOLF (lv3) — common + uncommon ───
+// ─── KURT / WOLF (lv3) ───
 const wolfDrops: readonly DropEntry[] = [
-  { itemId: 'shadow_dagger',   itemType: 'equipment',  chance: 0.08, minLevel: 1 },
-  { itemId: 'dark_blade',      itemType: 'equipment',  chance: 0.08, minLevel: 3 },
-  { itemId: 'shadow_buckler',  itemType: 'equipment',  chance: 0.06, minLevel: 1 },
-  { itemId: 'dark_ward',       itemType: 'equipment',  chance: 0.06, minLevel: 3 },
-  { itemId: 'shadow_wraps',    itemType: 'equipment',  chance: 0.06, minLevel: 1 },
-  { itemId: 'dark_plate',      itemType: 'equipment',  chance: 0.06, minLevel: 3 },
-  { itemId: 'book_lifesteal',  itemType: 'skillbook',  chance: 0.04, minLevel: 3 },
-  { itemId: 'book_dark_regen', itemType: 'skillbook',  chance: 0.03, minLevel: 1 },
+  { itemId: 'book_shadow_blade_up', itemType: 'skillbook', chance: 0.05, minLevel: 1 },
+  { itemId: 'book_dark_regen',      itemType: 'skillbook', chance: 0.03, minLevel: 1 },
 ] as const;
 
-// ─── ISKELET / SKELETON (lv4) — uncommon agirlikli ───
+// ─── ISKELET / SKELETON (lv4) ───
 const skeletonDrops: readonly DropEntry[] = [
-  { itemId: 'dark_blade',      itemType: 'equipment',  chance: 0.10, minLevel: 3 },
-  { itemId: 'dark_ward',       itemType: 'equipment',  chance: 0.10, minLevel: 3 },
-  { itemId: 'dark_plate',      itemType: 'equipment',  chance: 0.10, minLevel: 3 },
-  { itemId: 'book_iron_will',  itemType: 'skillbook',  chance: 0.05, minLevel: 4 },
-  { itemId: 'book_frenzy',     itemType: 'skillbook',  chance: 0.03, minLevel: 1 },
+  { itemId: 'book_shadow_shield_up', itemType: 'skillbook', chance: 0.05, minLevel: 4 },
+  { itemId: 'book_iron_will',        itemType: 'skillbook', chance: 0.04, minLevel: 4 },
 ] as const;
 
-// ─── ORK / ORC (lv5) — uncommon + rare ───
+// ─── ORK / ORC (lv5) ───
 const orcDrops: readonly DropEntry[] = [
-  { itemId: 'dark_blade',          itemType: 'equipment',  chance: 0.06, minLevel: 3 },
-  { itemId: 'dark_ward',           itemType: 'equipment',  chance: 0.06, minLevel: 3 },
-  { itemId: 'dark_plate',          itemType: 'equipment',  chance: 0.06, minLevel: 3 },
-  { itemId: 'void_edge',           itemType: 'equipment',  chance: 0.04, minLevel: 5 },
-  { itemId: 'void_barrier',        itemType: 'equipment',  chance: 0.04, minLevel: 5 },
-  { itemId: 'void_carapace',       itemType: 'equipment',  chance: 0.04, minLevel: 5 },
-  { itemId: 'book_shadow_cleave',  itemType: 'skillbook',  chance: 0.04, minLevel: 5 },
-  { itemId: 'book_lifesteal',      itemType: 'skillbook',  chance: 0.03, minLevel: 3 },
+  { itemId: 'book_shadow_shield_up', itemType: 'skillbook', chance: 0.04, minLevel: 5 },
+  { itemId: 'book_iron_will',        itemType: 'skillbook', chance: 0.03, minLevel: 5 },
+  { itemId: 'book_shadow_burst_up',  itemType: 'skillbook', chance: 0.03, minLevel: 5 },
 ] as const;
 
-// ─── KARA SOVALYE / DARK KNIGHT (lv8) — rare + epic ───
+// ─── KARA SOVALYE / DARK KNIGHT (lv8) — orta-yuksek ───
 const darkKnightDrops: readonly DropEntry[] = [
-  { itemId: 'void_edge',           itemType: 'equipment',  chance: 0.06, minLevel: 5 },
-  { itemId: 'void_barrier',        itemType: 'equipment',  chance: 0.06, minLevel: 5 },
-  { itemId: 'void_carapace',       itemType: 'equipment',  chance: 0.06, minLevel: 5 },
-  { itemId: 'abyssal_fang',        itemType: 'equipment',  chance: 0.03, minLevel: 8 },
-  { itemId: 'abyssal_aegis',       itemType: 'equipment',  chance: 0.03, minLevel: 8 },
-  { itemId: 'abyssal_shell',       itemType: 'equipment',  chance: 0.03, minLevel: 8 },
-  { itemId: 'book_taunt',          itemType: 'skillbook',  chance: 0.04, minLevel: 6 },
-  { itemId: 'book_shadow_cleave',  itemType: 'skillbook',  chance: 0.03, minLevel: 5 },
+  { itemId: 'book_shadow_burst_up',  itemType: 'skillbook', chance: 0.04, minLevel: 8 },
+  { itemId: 'book_shadow_shield_up', itemType: 'skillbook', chance: 0.03, minLevel: 4 },
 ] as const;
 
-// ─── SEYTAN / DEMON (lv12) — epic + legendary ───
+// ─── SEYTAN / DEMON (lv12) — boss only ───
 const demonDrops: readonly DropEntry[] = [
-  { itemId: 'abyssal_fang',        itemType: 'equipment',  chance: 0.05, minLevel: 8 },
-  { itemId: 'abyssal_aegis',       itemType: 'equipment',  chance: 0.05, minLevel: 8 },
-  { itemId: 'abyssal_shell',       itemType: 'equipment',  chance: 0.05, minLevel: 8 },
-  { itemId: 'monarchs_claw',       itemType: 'equipment',  chance: 0.01, minLevel: 12 },
-  { itemId: 'monarchs_guard',      itemType: 'equipment',  chance: 0.01, minLevel: 12 },
-  { itemId: 'monarchs_mantle',     itemType: 'equipment',  chance: 0.01, minLevel: 12 },
-  { itemId: 'book_shadow_step',    itemType: 'skillbook',  chance: 0.04, minLevel: 8 },
-  { itemId: 'book_taunt',          itemType: 'skillbook',  chance: 0.03, minLevel: 6 },
+  { itemId: 'book_shadow_burst_up',     itemType: 'skillbook', chance: 0.05, minLevel: 8 },
+  { itemId: 'book_sovereign_aura_up',   itemType: 'skillbook', chance: 0.03, minLevel: 12 },
 ] as const;
 
 // ─── EXPORT ───

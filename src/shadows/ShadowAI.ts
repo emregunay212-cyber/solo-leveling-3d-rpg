@@ -2,6 +2,8 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { SHADOW } from '../config/GameConfig';
 import type { Enemy } from '../enemies/Enemy';
 
+export type ShadowCombatMode = 'attack' | 'defense';
+
 export enum ShadowState {
   FOLLOW,
   CHASE,
@@ -12,12 +14,15 @@ export enum ShadowState {
 
 /**
  * Golge asker AI — oyuncuyu takip et, yakin dusmana saldir.
+ * Savas modu: 'attack' (agresif) veya 'defense' (savunma, varsayilan).
  */
 export class ShadowAI {
   public state = ShadowState.FOLLOW;
 
   private attackTimer = 0;
   private currentTarget: Enemy | null = null;
+  private combatMode: ShadowCombatMode = 'defense';
+  private forcedTarget = false; // oyuncu tarafindan zorla atanan hedef mi?
 
   public velocity = Vector3.Zero();
   private static readonly SEPARATION_RADIUS = 1.5;
@@ -35,6 +40,21 @@ export class ShadowAI {
     this.cfgAttackCooldown = attackCooldown ?? SHADOW.attackCooldown;
     this.cfgChaseSpeed = chaseSpeed ?? SHADOW.chaseSpeed;
     this.cfgPatrolSpeed = patrolSpeed ?? SHADOW.patrolSpeed;
+  }
+
+  public setMode(mode: ShadowCombatMode): void {
+    this.combatMode = mode;
+  }
+
+  public getMode(): ShadowCombatMode {
+    return this.combatMode;
+  }
+
+  /** Mevcut moda gore etkin chase range hesapla */
+  private getEffectiveChaseRange(): number {
+    return this.combatMode === 'attack'
+      ? SHADOW.chaseRange * 1.5
+      : SHADOW.chaseRange * 0.5;
   }
 
   update(
@@ -92,12 +112,22 @@ export class ShadowAI {
     selfPos: Vector3,
     enemies: Enemy[],
   ): void {
-    // Dusman ara
-    const nearestEnemy = this.findNearestEnemy(selfPos, enemies);
-    if (nearestEnemy) {
-      this.currentTarget = nearestEnemy;
-      this.state = ShadowState.CHASE;
-      return;
+    if (this.combatMode === 'attack') {
+      // SALDIRI modu: bagimsiz olarak yakin dusmani ara ve saldir
+      const nearestEnemy = this.findNearestEnemy(selfPos, enemies);
+      if (nearestEnemy) {
+        this.currentTarget = nearestEnemy;
+        this.forcedTarget = false;
+        this.state = ShadowState.CHASE;
+        return;
+      }
+    } else {
+      // SAVUNMA modu: sadece zorla atanmis hedef veya oyuncu komutuna yanit ver
+      // forcedTarget varsa kovala, yoksa dusman arama
+      if (this.forcedTarget && this.currentTarget && this.currentTarget.isAlive()) {
+        this.state = ShadowState.CHASE;
+        return;
+      }
     }
 
     // Oyuncuyu takip et
@@ -114,6 +144,7 @@ export class ShadowAI {
     // Oyuncudan cok uzaklastiysa geri don
     if (distToPlayer > SHADOW.leashRange) {
       this.currentTarget = null;
+      this.forcedTarget = false;
       this.state = ShadowState.RETURN;
       this.velocity.setAll(0);
       return;
@@ -121,6 +152,7 @@ export class ShadowAI {
 
     if (!this.currentTarget || !this.currentTarget.isAlive()) {
       this.currentTarget = null;
+      this.forcedTarget = false;
       this.state = ShadowState.FOLLOW;
       this.velocity.setAll(0);
       return;
@@ -144,12 +176,16 @@ export class ShadowAI {
   private updateAttack(dt: number, selfPos: Vector3, distToPlayer: number): void {
     if (distToPlayer > SHADOW.leashRange) {
       this.currentTarget = null;
+      this.forcedTarget = false;
       this.state = ShadowState.RETURN;
       return;
     }
 
     if (!this.currentTarget || !this.currentTarget.isAlive()) {
       this.currentTarget = null;
+      this.forcedTarget = false;
+      // Saldiri modunda: hedef oldugunde hemen yeni hedef ara
+      // Savunma modunda: takibe don
       this.state = ShadowState.FOLLOW;
       return;
     }
@@ -180,7 +216,7 @@ export class ShadowAI {
 
   private findNearestEnemy(selfPos: Vector3, enemies: Enemy[]): Enemy | null {
     let nearest: Enemy | null = null;
-    let nearestDist: number = SHADOW.chaseRange;
+    let nearestDist: number = this.getEffectiveChaseRange();
 
     for (const enemy of enemies) {
       if (!enemy.isAlive()) continue;
@@ -197,10 +233,11 @@ export class ShadowAI {
     return this.currentTarget;
   }
 
-  /** Oyuncu tarafindan zorla hedef atama (Ctrl+cift tik) */
+  /** Oyuncu tarafindan zorla hedef atama (Ctrl+cift tik veya tehdit yaniti) */
   public forceTarget(enemy: Enemy): void {
     if (!enemy.isAlive()) return;
     this.currentTarget = enemy;
+    this.forcedTarget = true;
     this.state = ShadowState.CHASE;
   }
 

@@ -1,10 +1,12 @@
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import type { Enemy } from '../enemies/Enemy';
-import type { EquipmentSlot, ShadowRank } from '../shadows/ShadowEnhancementTypes';
+import type { ShadowRank } from '../shadows/ShadowEnhancementTypes';
+import type { ShadowCombatMode } from '../shadows/ShadowAI';
 
 /**
  * Oyun olay tanimlari.
  * Tum event tipleri burada tanimlanir — string key hatalarini onler.
+ * Ekipman olaylari kaldirildi — golgeler artik sabit yetenekler kullanir.
  */
 export interface GameEvents {
   'enemy:death': { enemy: Enemy; xpReward: number; goldReward: number };
@@ -22,11 +24,9 @@ export interface GameEvents {
   'shadow:defeated': { shadowType: string };
   'shadow:failed': { reason: string };
   'stat:changed': Record<string, never>;
-  'shadow:equip': { shadowUid: number; slot: EquipmentSlot; itemId: string };
-  'shadow:unequip': { shadowUid: number; slot: EquipmentSlot; itemId: string };
-  'shadow:learnSkill': { shadowUid: number; skillId: string };
   'shadow:rankUp': { shadowUid: number; newRank: ShadowRank; rankName: string };
-  'loot:drop': { itemId: string; itemType: 'equipment' | 'skillbook'; enemyName: string };
+  'loot:drop': { itemId: string; itemType: 'skillbook'; enemyName: string };
+  'shadow:modeChanged': { mode: ShadowCombatMode };
 }
 
 type EventCallback<T> = (data: T) => void;

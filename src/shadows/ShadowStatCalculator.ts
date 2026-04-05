@@ -1,81 +1,47 @@
 /**
  * Golge Stat Hesaplayici
- * Saf fonksiyonlar: temel dusman def + ekipman + rutbe'den nihai statlari hesaplar.
+ * Oyuncu statlarina dayali yuzde kopyalama sistemi.
+ * Normal golgeler sabit yuzde, boss golgeleri rutbeye gore artan yuzde kullanir.
  * Yan etki yok — tamamen deterministik.
  */
 
-import { SHADOW, SHADOW_ENHANCEMENT } from '../config/GameConfig';
-import { EQUIPMENT_DEFS } from '../data/shadowEquipment';
+import { SHADOW_ENHANCEMENT } from '../config/GameConfig';
 import type { EnemyDef } from '../enemies/Enemy';
-import type { ShadowProfile, ShadowFinalStats, ShadowRank } from './ShadowEnhancementTypes';
+import type { ShadowProfile, ShadowFinalStats, PlayerStats, ShadowRank } from './ShadowEnhancementTypes';
 
-/** Rutbe bonus tanimini getir — bulunamazsa ilk rutbeyi dondurur */
-function getRankBonuses(rank: ShadowRank) {
-  return SHADOW_ENHANCEMENT.ranks.find(r => r.rank === rank) ?? SHADOW_ENHANCEMENT.ranks[0];
+/** Boss golgenin rutbesine gore stat yuzdesini getir */
+function getBossStatPercent(rank: ShadowRank): number {
+  const rankDef = SHADOW_ENHANCEMENT.ranks.find(r => r.rank === rank);
+  return rankDef?.statPercent ?? SHADOW_ENHANCEMENT.bossBaseStatPercent;
 }
 
 /**
  * Nihai golge statlarini hesapla.
- * Siralama: temel stat -> ekipman bonuslari -> rutbe bonuslari -> cap clamp.
+ * Oyuncu statlari x yuzde kopyalama sistemi.
  *
- * @param enemyDef  Golgenin kaynak dusman tanimi
- * @param profile   Golge profili (null ise sadece temel statlar dondurulur)
+ * @param enemyDef    Golgenin kaynak dusman tanimi
+ * @param profile     Golge profili (null ise sadece temel statlar dondurulur)
+ * @param playerStats Oyuncunun guncel statlari
  * @returns Hesaplanmis nihai statlar
  */
 export function calculateShadowStats(
   enemyDef: EnemyDef,
   profile: ShadowProfile | null,
+  playerStats: PlayerStats,
 ): ShadowFinalStats {
-  // Temel statlar: dusman def * golge carpanlari
-  let maxHp = Math.round(enemyDef.hp * SHADOW.shadowHpMultiplier);
-  let damage = Math.round(enemyDef.damage * SHADOW.shadowDamageMultiplier);
-  let defense = 0;
-  let blockChance = 0;
-  let attackCooldown: number = SHADOW.attackCooldown;
-  let chaseSpeed: number = SHADOW.chaseSpeed;
-  let patrolSpeed: number = SHADOW.patrolSpeed;
+  const isBoss = profile?.isBoss ?? enemyDef.isBoss ?? false;
+  const pct = isBoss
+    ? getBossStatPercent(profile?.rank ?? 'soldier')
+    : SHADOW_ENHANCEMENT.normalStatPercent;
 
-  if (!profile) {
-    return { maxHp, damage, defense, blockChance, attackCooldown, chaseSpeed, patrolSpeed };
-  }
-
-  // Ekipman bonuslarini uygula
-  const slotKeys: readonly EquipmentSlotKey[] = ['weapon', 'shield', 'armor'];
-  for (const slotKey of slotKeys) {
-    const itemId = profile.equipment[slotKey];
-    if (!itemId) continue;
-
-    const def = EQUIPMENT_DEFS[itemId];
-    if (!def) continue;
-
-    const s = def.stats;
-
-    if (s.bonusDamage) damage += s.bonusDamage;
-    if (s.bonusDamagePercent) damage = Math.round(damage * (1 + s.bonusDamagePercent));
-    if (s.bonusHp) maxHp += s.bonusHp;
-    if (s.bonusHpPercent) maxHp = Math.round(maxHp * (1 + s.bonusHpPercent));
-    if (s.bonusDefense) defense += s.bonusDefense;
-    if (s.bonusBlockChance) blockChance += s.bonusBlockChance;
-    if (s.bonusAttackSpeed) attackCooldown = Math.max(0.5, attackCooldown - s.bonusAttackSpeed);
-    if (s.bonusMoveSpeed) {
-      chaseSpeed += s.bonusMoveSpeed;
-      patrolSpeed += s.bonusMoveSpeed * 0.5;
-    }
-  }
-
-  // Rutbe bonuslarini uygula
-  const rankBonus = getRankBonuses(profile.rank);
-  maxHp = Math.round(maxHp * (1 + rankBonus.bonusHpPercent));
-  damage = Math.round(damage * (1 + rankBonus.bonusDamagePercent));
-  chaseSpeed *= (1 + rankBonus.bonusSpeedPercent);
-  patrolSpeed *= (1 + rankBonus.bonusSpeedPercent);
-  attackCooldown *= (1 - rankBonus.bonusCooldownReduction);
-
-  // Uest sinir clamp
-  blockChance = Math.min(blockChance, SHADOW_ENHANCEMENT.equipmentStatCaps.bonusBlockChance);
+  // Statlar oyuncu statlarindan yuzdeli turetilir
+  const maxHp = Math.max(20, Math.round(playerStats.vit * pct * 8));
+  const damage = Math.max(1, Math.round(playerStats.str * pct * 2));
+  const defense = Math.round(playerStats.vit * pct * 1.5);
+  const blockChance = 0; // sadece skill'lerden gelir
+  const attackCooldown: number = Math.max(0.5, 2.0 - playerStats.agi * pct * 0.02);
+  const chaseSpeed: number = 4.0 + playerStats.agi * pct * 0.05;
+  const patrolSpeed: number = 2.0 + playerStats.agi * pct * 0.025;
 
   return { maxHp, damage, defense, blockChance, attackCooldown, chaseSpeed, patrolSpeed };
 }
-
-// Dahili tip — slot anahtarlarini yinelemek icin
-type EquipmentSlotKey = 'weapon' | 'shield' | 'armor';
