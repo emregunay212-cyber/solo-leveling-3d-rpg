@@ -14,10 +14,18 @@ export interface SkillCastResult {
  * Yetenek yonetim sistemi.
  * Q/E/R/F skill slotlarini, cooldown, MP ve buff'lari yonetir.
  */
+/** Upgrade sabitleri */
+const MAX_UPGRADE_LEVEL = 5;
+const DAMAGE_BONUS_PER_LEVEL = 0.15;
+const COOLDOWN_REDUCTION_PER_LEVEL = 0.05;
+
 export class SkillSystem {
   private slots: SkillState[] = [];
   private input: InputManager;
   private keyWasDown = new Map<string, boolean>();
+
+  // Skill upgrade sistemi — her kitap +15% hasar, -5% cooldown
+  private skillUpgrades = new Map<string, number>();
 
   // Buff state
   private shieldActive = false;
@@ -91,12 +99,16 @@ export class SkillSystem {
     // MP kontrol
     if (currentMp < slot.def.mpCost) return null;
 
-    // Cooldown baslat
-    slot.cooldownRemaining = slot.def.cooldown;
+    // Upgrade seviyesine gore cooldown azaltma uygula
+    const upgradeLevel = this.getUpgradeLevel(slot.def.id);
+    const cdReduction = 1 - upgradeLevel * COOLDOWN_REDUCTION_PER_LEVEL;
+    slot.cooldownRemaining = slot.def.cooldown * Math.max(0.5, cdReduction);
 
-    // Hasar hesapla
+    // Hasar hesapla — upgrade bonusu ile
     const baseStat = slot.def.scaleStat === 'str' ? statStr : statInt;
-    const damage = Math.round(baseStat * slot.def.damageMultiplier);
+    const baseDamage = baseStat * slot.def.damageMultiplier;
+    const damageMultiplier = 1 + upgradeLevel * DAMAGE_BONUS_PER_LEVEL;
+    const damage = Math.round(baseDamage * damageMultiplier);
 
     // Buff aktif et (shield skill icin)
     if (slot.def.type === 'buff') {
@@ -112,6 +124,22 @@ export class SkillSystem {
 
     if (this.onCast) this.onCast(result);
     return result;
+  }
+
+  // ─── Skill Upgrade ───
+
+  /** Yetenek upgrade seviyesini artir. Maksimum 5. */
+  public upgradeSkill(skillId: string): boolean {
+    const current = this.skillUpgrades.get(skillId) ?? 0;
+    if (current >= MAX_UPGRADE_LEVEL) return false;
+    this.skillUpgrades.set(skillId, current + 1);
+    eventBus.emit('skill:upgraded', { skillId, newLevel: current + 1 });
+    return true;
+  }
+
+  /** Yetenek upgrade seviyesini dondur */
+  public getUpgradeLevel(skillId: string): number {
+    return this.skillUpgrades.get(skillId) ?? 0;
   }
 
   // ─── Getters ───

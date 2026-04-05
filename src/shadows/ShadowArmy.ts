@@ -112,6 +112,7 @@ export class ShadowArmy {
     const shadow = new ShadowSoldier(this.scene, position, sourceDef, this.playerStats, profile);
     shadow.setMode(this.armyMode);
     if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
+    this.bindShadowOnKill(shadow);
     this.shadows.push(shadow);
 
     eventBus.emit('shadow:extracted', {
@@ -209,12 +210,24 @@ export class ShadowArmy {
     }
     shadow.setMode(this.armyMode);
     if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
+    this.bindShadowOnKill(shadow);
     this.shadows.push(shadow);
     return true;
   }
 
   public getSoulSlots(): readonly SoulSlot[] {
     return this.soulSlots;
+  }
+
+  // ─── KILL TRACKING ───
+
+  /** Golge askerine kill callback'i bagla — profileManager uzerinden kill sayacini arttirir */
+  private bindShadowOnKill(shadow: ShadowSoldier): void {
+    shadow.setOnKill((uid: number) => {
+      if (this.profileManager) {
+        this.profileManager.incrementKills(uid);
+      }
+    });
   }
 
   // ─── MANA DRAIN ───

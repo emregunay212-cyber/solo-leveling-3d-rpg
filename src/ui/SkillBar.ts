@@ -9,6 +9,7 @@ export class SkillBar {
     wrapper: HTMLDivElement;
     cooldownOverlay: HTMLDivElement;
     cooldownText: HTMLSpanElement;
+    upgradeBadge: HTMLSpanElement;
   }> = new Map();
 
   constructor() {
@@ -97,6 +98,16 @@ export class SkillBar {
           text-shadow: 0 0 6px rgba(0,0,0,0.9);
           display: none;
         }
+        .skill-upgrade-badge {
+          position: absolute;
+          top: 2px; right: 3px;
+          font-family: 'Rajdhani', sans-serif;
+          color: #fbbf24;
+          font-size: 9px;
+          font-weight: 700;
+          text-shadow: 0 0 4px rgba(251,191,36,0.6);
+          display: none;
+        }
       </style>
     `;
 
@@ -110,6 +121,7 @@ export class SkillBar {
       wrapper.className = 'skill-slot';
       wrapper.innerHTML = `
         <span class="skill-key">${keyLabel}</span>
+        <span class="skill-upgrade-badge"></span>
         <span class="skill-name">${slot.def.name}</span>
         <span class="skill-cost">${slot.def.mpCost}</span>
         <div class="skill-cd-overlay" id="scd-ov-${slot.def.id}"></div>
@@ -121,14 +133,28 @@ export class SkillBar {
         wrapper,
         cooldownOverlay: wrapper.querySelector('.skill-cd-overlay') as HTMLDivElement,
         cooldownText: wrapper.querySelector('.skill-cd-text') as HTMLSpanElement,
+        upgradeBadge: wrapper.querySelector('.skill-upgrade-badge') as HTMLSpanElement,
       });
     }
   }
 
-  public update(slots: readonly SkillState[], currentMp: number): void {
+  public update(
+    slots: readonly SkillState[],
+    currentMp: number,
+    getUpgradeLevel?: (skillId: string) => number,
+  ): void {
     for (const slot of slots) {
       const el = this.slotElements.get(slot.def.id);
       if (!el) continue;
+
+      // Upgrade badge
+      const upgradeLevel = getUpgradeLevel ? getUpgradeLevel(slot.def.id) : 0;
+      if (upgradeLevel > 0) {
+        el.upgradeBadge.style.display = 'block';
+        el.upgradeBadge.textContent = `+${upgradeLevel}`;
+      } else {
+        el.upgradeBadge.style.display = 'none';
+      }
 
       if (slot.cooldownRemaining > 0) {
         el.cooldownOverlay.style.display = 'block';

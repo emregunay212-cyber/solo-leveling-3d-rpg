@@ -20,6 +20,7 @@ export interface GameEvents {
   'combat:combo': { index: number; isFinisher: boolean };
   'skill:cast': { skillId: string; mpCost: number };
   'skill:hit': { skillId: string; damage: number; targetCount: number };
+  'skill:upgraded': { skillId: string; newLevel: number };
   'shadow:extracted': { shadowType: string; name: string };
   'shadow:defeated': { shadowType: string };
   'shadow:failed': { reason: string };

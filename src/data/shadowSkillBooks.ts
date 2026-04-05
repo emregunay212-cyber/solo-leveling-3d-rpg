@@ -205,6 +205,24 @@ const book_iron_will: ShadowSkillDef = {
   sellPrice: 100,
 } as const;
 
+// ─── KITAP → SKILL ESLESMESI ───
+
+/** Hangi kitap hangi oyuncu yetenegini guclendirir */
+export const BOOK_TO_SKILL_MAP: Readonly<Record<string, string>> = {
+  'book_shadow_blade_up': 'shadowBlade',
+  'book_shadow_shield_up': 'shadowShield',
+  'book_shadow_burst_up': 'shadowBurst',
+  'book_sovereign_aura_up': 'sovereignAura',
+} as const;
+
+/** Skill ID → skill display bilgisi (UI icin) */
+export const SKILL_KEY_LABELS: Readonly<Record<string, string>> = {
+  'shadowBlade': 'Q',
+  'shadowShield': 'E',
+  'shadowBurst': 'R',
+  'sovereignAura': 'F',
+} as const;
+
 // ─── EXPORT ───
 
 /** Dusman-icerik yetenekler — golge askerlerinin otomatik kullandigi */

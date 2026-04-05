@@ -10,7 +10,7 @@ import type { ShadowInventory } from '../systems/ShadowInventory';
 import type { ShadowProfile } from '../shadows/ShadowEnhancementTypes';
 import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
 import type { EnemyDef } from '../enemies/Enemy';
-import { PLAYER_SKILL_BOOK_DEFS, ENEMY_SKILL_DEFS } from '../data/shadowSkillBooks';
+import { PLAYER_SKILL_BOOK_DEFS, ENEMY_SKILL_DEFS, BOOK_TO_SKILL_MAP, SKILL_KEY_LABELS } from '../data/shadowSkillBooks';
 import { SHADOW_ENHANCEMENT } from '../config/GameConfig';
 import { calculateShadowStats } from '../shadows/ShadowStatCalculator';
 
@@ -30,6 +30,7 @@ export class ShadowManageUI {
   private profileManager: ShadowProfileManager;
   private inventory: ShadowInventory;
   private getEnemyDef: (name: string) => EnemyDef | null;
+  private onUseBookCb: ((bookId: string) => boolean) | null = null;
 
   constructor(
     profileManager: ShadowProfileManager,
@@ -73,6 +74,11 @@ export class ShadowManageUI {
 
   public setPlayerStats(stats: PlayerStats): void {
     this.playerStats = stats;
+  }
+
+  /** Kitap kullanma callback'i — TestScene tarafindan baglanir */
+  public setOnUseBook(cb: (bookId: string) => boolean): void {
+    this.onUseBookCb = cb;
   }
 
   public refresh(): void {
@@ -438,14 +444,55 @@ export class ShadowManageUI {
       for (const book of books) {
         const def = PLAYER_SKILL_BOOK_DEFS[book.id];
         if (!def) continue;
+        const skillId = BOOK_TO_SKILL_MAP[book.id];
+        const keyLabel = skillId ? (SKILL_KEY_LABELS[skillId] ?? '') : '';
+        const canUse = !!skillId && !!this.onUseBookCb;
+        const useLabel = keyLabel ? `Kullan (${keyLabel})` : 'Kullan';
         html += `<div class="smu-card">
           <div class="smu-card-name" style="color:#c084fc">${def.name} x${book.count}</div>
           <div class="smu-card-desc">${def.description}</div>
+          <div style="display:flex;justify-content:flex-end;margin-top:4px">
+            <span class="smu-btn${canUse ? '' : ' disabled'}" data-use-book="${book.id}">${useLabel}</span>
+          </div>
         </div>`;
       }
       html += '</div>';
     }
     html += '</div>';
     right.innerHTML = html;
+
+    // Kitap kullanma event'leri
+    right.querySelectorAll('[data-use-book]').forEach(el => {
+      el.addEventListener('click', () => {
+        const bookId = (el as HTMLElement).dataset['useBook']!;
+        if (this.onUseBookCb) {
+          const success = this.onUseBookCb(bookId);
+          if (success) {
+            const skillId = BOOK_TO_SKILL_MAP[bookId];
+            const keyLabel = skillId ? (SKILL_KEY_LABELS[skillId] ?? '') : '';
+            const msg = keyLabel
+              ? `${keyLabel} yetenegi guclendirildi! (+15% hasar)`
+              : 'Yetenek guclendirildi!';
+            this.showNotification(msg);
+            this.refresh();
+          }
+        }
+      });
+    });
+  }
+
+  /** Kisa sureli bildirim goster */
+  private showNotification(msg: string): void {
+    const note = document.createElement('div');
+    note.style.cssText = `
+      position:fixed; top:20%; left:50%; transform:translateX(-50%);
+      background:rgba(168,85,247,0.9); color:#fff; padding:8px 20px;
+      border-radius:6px; font-family:'Rajdhani',sans-serif; font-size:14px;
+      font-weight:700; z-index:100; pointer-events:none;
+      animation:smu-fade 2s forwards;
+    `;
+    note.textContent = msg;
+    document.body.appendChild(note);
+    setTimeout(() => note.remove(), 2000);
   }
 }

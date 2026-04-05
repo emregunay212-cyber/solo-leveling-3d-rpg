@@ -35,6 +35,7 @@ import { ShadowProfileManager } from '../shadows/ShadowProfileManager';
 import { ShadowInventory } from '../systems/ShadowInventory';
 import { DropSystem } from '../systems/DropSystem';
 import { ShadowManageUI } from '../ui/ShadowManageUI';
+import { BOOK_TO_SKILL_MAP } from '../data/shadowSkillBooks';
 import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
 import { SKILLS, MP, SHADOW } from '../config/GameConfig';
 import { initDevConsole, disposeDevConsole } from '../systems/DevConsole';
@@ -191,6 +192,14 @@ export class TestScene implements GameScene {
       this.shadowInventory,
       (name: string) => ENEMY_DEFS[name] ?? null,
     );
+
+    // Kitap kullanma callback'i — envanterdeki kitabi tuketip skill'i guclendirir
+    this.shadowManageUI.setOnUseBook((bookId: string): boolean => {
+      const skillId = BOOK_TO_SKILL_MAP[bookId];
+      if (!skillId) return false;
+      if (!this.shadowInventory.removeItem(bookId, 1)) return false;
+      return this.skillSystem.upgradeSkill(skillId);
+    });
 
     // Tab key toggles shadow manage UI, G key toggles shadow combat mode
     window.addEventListener('keydown', (e) => {
@@ -450,8 +459,12 @@ export class TestScene implements GameScene {
     // MP regen
     this.updateMpRegen(dt);
 
-    // Skill bar UI update
-    this.skillBar.update(this.skillSystem.getSlots(), this.playerMp);
+    // Skill bar UI update (upgrade seviyesi ile)
+    this.skillBar.update(
+      this.skillSystem.getSlots(),
+      this.playerMp,
+      (skillId: string) => this.skillSystem.getUpgradeLevel(skillId),
+    );
 
     // Shadow army + selection update
     this.shadowArmy.update(ctx, this.enemies);

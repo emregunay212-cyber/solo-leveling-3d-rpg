@@ -44,6 +44,7 @@ export class ShadowSoldier {
   private profile: ShadowProfile | null = null;
   public finalStats: ShadowFinalStats | null = null;
   private skillRunner: ShadowSkillRunner | null = null;
+  private onKillCallback: ((uid: number) => void) | null = null;
 
   constructor(
     scene: Scene,
@@ -188,8 +189,13 @@ export class ShadowSoldier {
         }
 
         // Hedef oldu mu? onKill tetikle
-        if (!target.isAlive() && this.skillRunner) {
-          this.skillRunner.onKill();
+        if (!target.isAlive()) {
+          if (this.skillRunner) {
+            this.skillRunner.onKill();
+          }
+          if (this.profile && this.onKillCallback) {
+            this.onKillCallback(this.profile.uid);
+          }
         }
       }
     }
@@ -306,6 +312,11 @@ export class ShadowSoldier {
   public getProfile(): ShadowProfile | null {
     if (!this.profile) return null;
     return { ...this.profile, hpPercent: this.maxHp > 0 ? this.hp / this.maxHp : 0 };
+  }
+
+  /** Kill callback'i ayarla — ShadowArmy profil yoneticisine baglar */
+  public setOnKill(cb: (uid: number) => void): void {
+    this.onKillCallback = cb;
   }
 
   /** Hedef olduruldu — ordu veya AI tarafindan cagirilir */
