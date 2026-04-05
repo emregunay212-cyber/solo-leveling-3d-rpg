@@ -39,6 +39,7 @@ export class Enemy implements Damageable {
   public velocity = Vector3.Zero();
   public def: EnemyDef;
   public ai: EnemyAI;
+  public typeKey = '';
 
   private scene: Scene;
   private id: number;

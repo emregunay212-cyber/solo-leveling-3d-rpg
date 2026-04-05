@@ -35,8 +35,11 @@ export function calculateShadowStats(
     : SHADOW_ENHANCEMENT.normalStatPercent;
 
   // Statlar oyuncu statlarindan yuzdeli turetilir
-  const maxHp = Math.max(20, Math.round(playerStats.vit * pct * 8));
-  const damage = Math.max(1, Math.round(playerStats.str * pct * 2));
+  // Minimum: dusman def degerlerinin bir yuzdesini taban olarak kullan
+  const rawMaxHp = Math.max(20, Math.round(playerStats.vit * pct * 8));
+  const rawDamage = Math.max(1, Math.round(playerStats.str * pct * 2));
+  const maxHp = Math.max(rawMaxHp, Math.round(enemyDef.hp * 0.3));
+  const damage = Math.max(rawDamage, Math.round(enemyDef.damage * 0.5));
   const defense = Math.round(playerStats.vit * pct * 1.5);
   const blockChance = 0; // sadece skill'lerden gelir
   const attackCooldown: number = Math.max(0.5, 2.0 - playerStats.agi * pct * 0.02);

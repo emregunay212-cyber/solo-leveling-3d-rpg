@@ -52,9 +52,14 @@ export class ShadowArmy {
     this.damageNumbers = dn;
   }
 
-  /** Oyuncu statlari degistiginde cagir — yeni golgeler guncel statlarla olusturulur */
+  /** Oyuncu statlari degistiginde cagir — mevcut ve yeni golgeler guncel statlarla hesaplanir */
   public setPlayerStats(stats: PlayerStats): void {
     this.playerStats = stats;
+    for (const shadow of this.shadows) {
+      if (shadow.isAlive()) {
+        shadow.recalculateStats(stats);
+      }
+    }
   }
 
   // ─── SAVAS MODU ───
@@ -85,6 +90,7 @@ export class ShadowArmy {
     position: Vector3,
     playerLevel: number,
     playerInt: number,
+    typeKey?: string,
   ): boolean {
 
     // Sans hesapla: baz + INT bonusu
@@ -104,8 +110,9 @@ export class ShadowArmy {
     }
 
     // Profil olustur (profil yoneticisi varsa)
+    const enemyDefId = typeKey ?? sourceDef.name;
     const profile = this.profileManager
-      ? this.profileManager.createProfile(sourceDef.name, sourceDef.isBoss, sourceDef.shadowSkillIds)
+      ? this.profileManager.createProfile(enemyDefId, sourceDef.isBoss, sourceDef.shadowSkillIds)
       : undefined;
 
     // Golge olustur — playerStats ile stat hesaplamasi yapilir

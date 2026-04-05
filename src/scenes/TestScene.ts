@@ -48,6 +48,7 @@ export class TestScene implements GameScene {
   private enemies: Enemy[] = [];
 
   // Systems
+  private keyHandler: ((e: KeyboardEvent) => void) | null = null;
   private clickIndicator!: ClickIndicator;
   private levelSystem!: LevelSystem;
   private deathScreen!: DeathScreen;
@@ -203,7 +204,7 @@ export class TestScene implements GameScene {
     });
 
     // Tab key toggles shadow manage UI, G key toggles shadow combat mode
-    window.addEventListener('keydown', (e) => {
+    this.keyHandler = (e: KeyboardEvent): void => {
       if (e.code === 'Tab') {
         e.preventDefault();
         this.shadowManageUI.toggle();
@@ -212,7 +213,8 @@ export class TestScene implements GameScene {
         const newMode = this.shadowArmy.toggleMode();
         this.shadowUI.updateMode(newMode);
       }
-    });
+    };
+    window.addEventListener('keydown', this.keyHandler);
 
     // Soul slot click opens manage UI with that slot's shadow selected
     this.shadowUI.setOnSlotClick((slotIndex: number) => {
@@ -261,6 +263,7 @@ export class TestScene implements GameScene {
     if (!def) return;
 
     const enemy = new Enemy(scene, pos, def);
+    enemy.typeKey = type;
     this.game.combatSystem.registerTarget(enemy);
 
     enemy.setOnDeath((e) => {
@@ -589,6 +592,7 @@ export class TestScene implements GameScene {
       enemy.def, pos,
       this.levelSystem.level,
       this.levelSystem.int,
+      enemy.typeKey,
     );
 
     if (success) {
@@ -815,6 +819,9 @@ export class TestScene implements GameScene {
   onExit(): void {}
 
   onDispose(): void {
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler);
+    }
     this.meshes.forEach(m => m.dispose());
     this.aggregates.forEach(a => a.dispose());
     this.enemies.forEach(e => e.dispose());

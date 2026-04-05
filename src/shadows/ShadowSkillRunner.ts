@@ -62,7 +62,7 @@ export class ShadowSkillRunner {
    * Tetik: golge bir dusmana saldirdi.
    * Bonus hasar ve AoE yaricap bilgisi doner.
    */
-  onAttack(_target: Enemy, _selfPos: Vector3, baseDamage: number): AttackResult {
+  onAttack(_target: Enemy, _selfPos: Vector3, baseDamage: number, nearbyAllies: number = 0): AttackResult {
     let bonusDamage = 0;
     let aoeRadius = 0;
 
@@ -72,13 +72,18 @@ export class ShadowSkillRunner {
 
       const { effect } = skill;
 
+      // Pack bonus: sadece yakin golge varsa uygula
+      if (skill.id === 'enemy_pack_bonus' && nearbyAllies <= 0) {
+        continue;
+      }
+
       // AoE saldiri (Shadow Cleave, Hellfire vb.)
       if (effect.aoeRadius && effect.damageMultiplier) {
         bonusDamage += baseDamage * (effect.damageMultiplier - 1);
         aoeRadius = Math.max(aoeRadius, effect.aoeRadius);
         this.cooldowns.set(skill.id, skill.cooldown);
       }
-      // Duz hasar carpani (Heavy Strike, Pack Bonus vb.)
+      // Duz hasar carpani (Heavy Strike, Pack Bonus, Poison Strike vb.)
       else if (effect.damageMultiplier && effect.damageMultiplier > 1) {
         bonusDamage += baseDamage * (effect.damageMultiplier - 1);
         if (skill.cooldown > 0) {
@@ -209,6 +214,17 @@ export class ShadowSkillRunner {
     for (const buff of this.activeBuffs) {
       if (buff.stats.bonusDamagePercent) {
         total += buff.stats.bonusDamagePercent;
+      }
+    }
+    return total;
+  }
+
+  /** Always-active onAttack skill'lerden toplam saldiri hizi bonusu (0-1 arasi) */
+  getAttackSpeedBonus(): number {
+    let total = 0;
+    for (const skill of this.skills) {
+      if (skill.trigger === 'onAttack' && skill.effect.statBuff?.bonusAttackSpeed) {
+        total += skill.effect.statBuff.bonusAttackSpeed;
       }
     }
     return total;

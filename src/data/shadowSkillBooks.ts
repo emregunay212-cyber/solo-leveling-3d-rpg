@@ -39,10 +39,10 @@ const enemy_poison_strike: ShadowSkillDef = {
   name: 'Zehirli Darbe',
   type: 'passive',
   trigger: 'onAttack',
-  description: '3sn boyunca %2 maxHP hasar',
-  cooldown: 5,
+  description: 'Zehirli saldiri: +%30 hasar',
+  cooldown: 0,
   requiredLevel: 0,
-  effect: { damageMultiplier: 1.0, durationSeconds: 3, healPercent: -0.02 },
+  effect: { damageMultiplier: 1.3 },
   buyPrice: 0,
   sellPrice: 0,
 } as const;
@@ -226,6 +226,8 @@ export const SKILL_KEY_LABELS: Readonly<Record<string, string>> = {
   'shadowShield': 'E',
   'shadowBurst': 'R',
   'sovereignAura': 'F',
+  'passive_hp_regen': 'HP\u2191',
+  'passive_damage_reduce': 'DEF\u2191',
 } as const;
 
 // ─── EXPORT ───

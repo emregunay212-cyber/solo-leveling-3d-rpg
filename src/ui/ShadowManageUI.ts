@@ -240,7 +240,9 @@ export class ShadowManageUI {
 
     let html = '';
     for (const [defId, list] of groups) {
-      html += `<div class="smu-group-label">${defId} (${list.length})</div>`;
+      const enemyDef = this.getEnemyDef(defId);
+      const displayName = enemyDef?.name ?? defId;
+      html += `<div class="smu-group-label">${displayName} (${list.length})</div>`;
       for (const p of list) {
         const sel = p.uid === this.selectedUid ? ' sel' : '';
         const rc = RANK_COLORS[p.rank] ?? '#aaa';

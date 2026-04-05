@@ -38,6 +38,7 @@ export class ShadowSoldier {
   private hpBarBg: Mesh;
   private hpBarFill: Mesh;
   private fillMat: StandardMaterial;
+  private hpBarBgMat!: StandardMaterial;
   private isDead = false;
   private damageNumbers: DamageNumbers | null = null;
   private isSelected = false;
@@ -93,12 +94,12 @@ export class ShadowSoldier {
     }, scene);
     this.hpBarBg.billboardMode = Mesh.BILLBOARDMODE_ALL;
     this.hpBarBg.isPickable = false;
-    const bgMat = new StandardMaterial(`shpBgMat_${this.id}`, scene);
-    bgMat.diffuseColor = new Color3(0.1, 0.05, 0.15);
-    bgMat.emissiveColor = new Color3(0.05, 0.02, 0.08);
-    bgMat.disableLighting = true;
-    bgMat.backFaceCulling = false;
-    this.hpBarBg.material = bgMat;
+    this.hpBarBgMat = new StandardMaterial(`shpBgMat_${this.id}`, scene);
+    this.hpBarBgMat.diffuseColor = new Color3(0.1, 0.05, 0.15);
+    this.hpBarBgMat.emissiveColor = new Color3(0.05, 0.02, 0.08);
+    this.hpBarBgMat.disableLighting = true;
+    this.hpBarBgMat.backFaceCulling = false;
+    this.hpBarBg.material = this.hpBarBgMat;
 
     this.hpBarFill = MeshBuilder.CreatePlane(`shpFill_${this.id}`, { width: 0.95, height: 0.07 }, scene);
     this.hpBarFill.parent = this.hpBarBg;
@@ -111,18 +112,23 @@ export class ShadowSoldier {
     this.fillMat.backFaceCulling = false;
     this.hpBarFill.material = this.fillMat;
 
-    // AI — profil statlari varsa konfigurasyona aktar
-    this.ai = new ShadowAI(
-      this.finalStats?.attackCooldown,
-      this.finalStats?.chaseSpeed,
-      this.finalStats?.patrolSpeed,
-    );
-
     // Yetenek sistemi — profilden veya kaynak dusmanin sabit yeteneklerinden
     const skillIds = this.profile?.shadowSkillIds ?? sourceDef.shadowSkillIds ?? [];
     if (skillIds.length > 0) {
       this.skillRunner = new ShadowSkillRunner(skillIds);
     }
+
+    // AI — profil statlari varsa konfigurasyona aktar
+    // Saldiri hizi bonusunu cooldown'a uygula
+    const baseAttackCooldown = this.finalStats?.attackCooldown ?? 2.0;
+    const attackSpeedBonus = this.skillRunner?.getAttackSpeedBonus() ?? 0;
+    const effectiveAttackCooldown = Math.max(0.3, baseAttackCooldown * (1 - attackSpeedBonus));
+
+    this.ai = new ShadowAI(
+      effectiveAttackCooldown,
+      this.finalStats?.chaseSpeed,
+      this.finalStats?.patrolSpeed,
+    );
   }
 
   public update(ctx: GameContext, enemies: Enemy[], otherShadowPositions: Vector3[] = []): void {
@@ -185,8 +191,12 @@ export class ShadowSoldier {
         const bonusPercent = this.skillRunner?.getActiveBonusDamagePercent() ?? 0;
         const effectiveDamage = Math.round(this.damage * (1 + bonusPercent));
 
+        // Yakin golge sayisini hesapla (pack_bonus icin)
+        const nearbyAllies = otherShadowPositions.filter(
+          p => this.position.subtract(p).length() < 5,
+        ).length;
         // Skill tetikleme: onAttack (Shadow Cleave AoE vb.)
-        const attackResult = this.skillRunner?.onAttack(target, this.position, effectiveDamage);
+        const attackResult = this.skillRunner?.onAttack(target, this.position, effectiveDamage, nearbyAllies);
         const totalDamage = effectiveDamage + (attackResult?.bonusDamage ?? 0);
 
         target.takeDamage(totalDamage, false, this.position);
@@ -197,6 +207,13 @@ export class ShadowSoldier {
         if (lifestealHeal > 0 && this.hp < this.maxHp) {
           this.hp = Math.min(this.maxHp, this.hp + lifestealHeal);
           this.hpBarFill.scaling.x = Math.max(0.01, this.hp / this.maxHp);
+          // Gorsel geri bildirim: yesil iyilesme sayisi
+          if (this.damageNumbers) {
+            this.damageNumbers.spawn(
+              this.mesh.position.add(new Vector3(0, 2.0, 0)),
+              lifestealHeal, 'parry',
+            );
+          }
         }
 
         if (this.damageNumbers) {
@@ -243,6 +260,21 @@ export class ShadowSoldier {
     if (vel.lengthSquared() > 0.01) {
       this.mesh.rotation.y = Math.atan2(vel.x, vel.z);
     }
+  }
+
+  /** Oyuncu statlari degistiginde golge statlarini yeniden hesapla */
+  public recalculateStats(playerStats: PlayerStats): void {
+    const stats = calculateShadowStats(this.def, this.profile, playerStats);
+    this.finalStats = stats;
+
+    // HP oranini koru
+    const hpRatio = this.maxHp > 0 ? this.hp / this.maxHp : 1;
+    this.maxHp = stats.maxHp;
+    this.hp = Math.max(1, Math.round(this.maxHp * hpRatio));
+    this.damage = stats.damage;
+
+    // HP bar guncelle
+    this.hpBarFill.scaling.x = Math.max(0.01, this.hp / this.maxHp);
   }
 
   /** Stoktan cikarken HP yuzdesini ayarla */
@@ -347,5 +379,8 @@ export class ShadowSoldier {
     this.mesh.dispose();
     this.hpBarBg.dispose();
     this.hpBarFill.dispose();
+    this.mat.dispose();
+    this.fillMat.dispose();
+    this.hpBarBgMat.dispose();
   }
 }
