@@ -292,7 +292,6 @@ export const SHADOW_ENHANCEMENT = {
     { rank: 'elite', name: 'Elit', requiredKills: 50, statPercent: 0.35 },
     { rank: 'commander', name: 'Komutan', requiredKills: 150, statPercent: 0.40 },
   ],
-  craftRatio: 3,
 } as const;
 
 // ─── UI ───

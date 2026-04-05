@@ -141,6 +141,24 @@ export class ShadowSoldier {
         this.hpBarFill.scaling.x = Math.max(0.01, this.hp / this.maxHp);
       }
 
+      // Periyodik AoE hasar (Cehennem Atesi vb.)
+      const periodicAoe = this.skillRunner.getPeriodicAoeDamage(this.damage);
+      if (periodicAoe.damage > 0 && periodicAoe.aoeRadius > 0) {
+        for (const enemy of enemies) {
+          if (!enemy.isAlive()) continue;
+          const dist = enemy.mesh.position.subtract(this.position).length();
+          if (dist <= periodicAoe.aoeRadius) {
+            enemy.takeDamage(periodicAoe.damage, false, this.position);
+            if (this.damageNumbers) {
+              this.damageNumbers.spawn(
+                enemy.mesh.position.add(new Vector3(0, 1.5, 0)),
+                periodicAoe.damage, 'skill',
+              );
+            }
+          }
+        }
+      }
+
       // Shadow Step: dusmanin arkasina isinlan
       if (this.skillRunner.shouldTeleportBehind()) {
         const target = this.ai.getCurrentTarget();

@@ -178,6 +178,20 @@ export class ShadowSkillRunner {
     return Math.round(heal);
   }
 
+  /** Periyodik AoE hasar — enemy_hellfire gibi periodic damage skilleri */
+  getPeriodicAoeDamage(baseDamage: number): { damage: number; aoeRadius: number } {
+    let damage = 0;
+    let aoeRadius = 0;
+    for (const skill of this.skills) {
+      if (skill.trigger === 'periodic' && skill.effect.aoeRadius && skill.effect.damageMultiplier && this.isReady(skill.id)) {
+        damage += baseDamage * skill.effect.damageMultiplier;
+        aoeRadius = Math.max(aoeRadius, skill.effect.aoeRadius);
+        this.cooldowns.set(skill.id, skill.cooldown);
+      }
+    }
+    return { damage: Math.round(damage), aoeRadius };
+  }
+
   /** Shadow Step: teleportBehind skill'i hazir mi? Hazirsa cooldown baslat */
   shouldTeleportBehind(): boolean {
     for (const skill of this.skills) {
