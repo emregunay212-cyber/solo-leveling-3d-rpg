@@ -281,6 +281,8 @@ export class TestScene implements GameScene {
       getMp: () => this.playerMp,
       setHp: (v) => { this.playerHp = v; },
       setMp: (v) => { this.playerMp = v; },
+      teleportTo: (x, y, z) => { this.game.player.root.position.set(x, y, z); },
+      enterDungeon: (rank) => { this.enterDungeon(rank as DungeonRank); },
     });
 
     this.game.playerCamera.setOnRightClickGround((worldPos) => {

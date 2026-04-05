@@ -29,6 +29,8 @@ interface DevDeps {
   readonly getMp: () => number;
   readonly setHp: (v: number) => void;
   readonly setMp: (v: number) => void;
+  readonly teleportTo?: (x: number, y: number, z: number) => void;
+  readonly enterDungeon?: (rank: string) => void;
 }
 
 interface DevWindow {
@@ -40,6 +42,8 @@ interface DevWindow {
   stats: () => void;
   setStat: (stat: string, value: number) => void;
   addStatPoints: (amount: number) => void;
+  tp: (x: number, y: number, z: number) => void;
+  dungeon: (rank: string) => void;
   _devConsoleCleanup?: () => void;
 }
 
@@ -120,6 +124,24 @@ export function initDevConsole(deps: DevDeps): void {
     console.log(`[DEV] +${amount} stat puani → Toplam: ${deps.levelSystem.statPoints}`);
   };
 
+  w.tp = (x: number, y: number, z: number) => {
+    if (deps.teleportTo) {
+      deps.teleportTo(x, y, z);
+      console.log(`[DEV] Teleport → (${x}, ${y}, ${z})`);
+    } else {
+      console.log('[DEV] Teleport desteklenmiyor');
+    }
+  };
+
+  w.dungeon = (rank: string) => {
+    if (deps.enterDungeon) {
+      deps.enterDungeon(rank.toUpperCase());
+      console.log(`[DEV] Dungeon → ${rank.toUpperCase()}-Rank`);
+    } else {
+      console.log('[DEV] Dungeon girisi desteklenmiyor');
+    }
+  };
+
   // Temizlik fonksiyonu
   w._devConsoleCleanup = () => {
     delete (w as Partial<DevWindow>).setLevel;
@@ -130,11 +152,13 @@ export function initDevConsole(deps: DevDeps): void {
     delete (w as Partial<DevWindow>).stats;
     delete (w as Partial<DevWindow>).setStat;
     delete (w as Partial<DevWindow>).addStatPoints;
+    delete (w as Partial<DevWindow>).tp;
+    delete (w as Partial<DevWindow>).dungeon;
     delete (w as Partial<DevWindow>)._devConsoleCleanup;
   };
 
   console.log(
-    '%c[DEV CONSOLE] %cKomutlar: setLevel(n), addXp(n), heal(), god(), kill(), stats(), setStat(stat,n), addStatPoints(n)',
+    '%c[DEV CONSOLE] %cKomutlar: setLevel(n), addXp(n), heal(), god(), kill(), stats(), setStat(stat,n), addStatPoints(n), tp(x,y,z), dungeon(rank)',
     'color: #c084fc; font-weight: bold',
     'color: #888',
   );
