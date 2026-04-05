@@ -125,9 +125,13 @@ export class ShadowArmy {
 
   /** Her frame guncelle */
   public update(ctx: GameContext, enemies: Enemy[]): void {
-    // Olu golgeleri temizle
+    // Olu golgeleri temizle + profillerini sil
     for (let i = this.shadows.length - 1; i >= 0; i--) {
       if (!this.shadows[i].isAlive()) {
+        const deadProfile = this.shadows[i].getProfile();
+        if (deadProfile && this.profileManager) {
+          this.profileManager.deleteProfile(deadProfile.uid);
+        }
         eventBus.emit('shadow:defeated', { shadowType: this.shadows[i].def.name });
         this.shadows[i].dispose();
         this.shadows.splice(i, 1);
