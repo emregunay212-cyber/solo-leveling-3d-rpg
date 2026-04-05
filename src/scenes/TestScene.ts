@@ -74,6 +74,7 @@ export class TestScene implements GameScene {
   private gold = 0;
   private lastDeathPos = Vector3.Zero();
   private mpRegenAccum = 0;
+  private hpRegenAccum = 0;
   private shadowDrainAccum = 0;
 
   constructor(game: Game) {
@@ -315,7 +316,12 @@ export class TestScene implements GameScene {
     });
 
     if (result.type !== 'parry') {
-      this.playerHp = Math.max(0, this.playerHp - result.damage);
+      // Demir Irade passive hasar azaltma
+      const passiveReduce = this.skillSystem.getPassiveDamageReduction();
+      const finalDmg = passiveReduce > 0
+        ? Math.max(1, Math.round(result.damage * (1 - passiveReduce)))
+        : result.damage;
+      this.playerHp = Math.max(0, this.playerHp - finalDmg);
     }
 
     eventBus.emit('player:damage', { amount: result.damage, type: result.type });
@@ -471,11 +477,7 @@ export class TestScene implements GameScene {
     this.shadowSelection.update();
     this.updateSoulSummon();
     this.shadowUI.setExtractMode(this.game.input.isKeyDown('AltLeft') || this.game.input.isKeyDown('AltRight'));
-    this.shadowUI.updateCount(
-      this.shadowArmy.getAliveCount(),
-      this.shadowArmy.getManaDrainPerSecond(this.levelSystem.level),
-      this.levelSystem.getMpRegen(),
-    );
+    this.shadowUI.updateCount(this.shadowArmy.getAliveCount());
     this.shadowUI.updateSoulSlots(this.shadowArmy.getSoulSlots());
     this.shadowUI.updateMode(this.shadowArmy.getMode());
 
@@ -673,6 +675,18 @@ export class TestScene implements GameScene {
       this.playerMp = Math.min(this.playerMaxMp, this.playerMp + regen);
     }
 
+    // HP regen (Karanlik Yenilenme passive kitabi)
+    const hpRegenPct = this.skillSystem.getPassiveHpRegenPercent();
+    if (hpRegenPct > 0 && this.playerHp < this.playerMaxHp) {
+      this.hpRegenAccum += dt;
+      if (this.hpRegenAccum >= 1) {
+        this.hpRegenAccum -= 1;
+        const heal = Math.round(this.playerMaxHp * hpRegenPct);
+        this.playerHp = Math.min(this.playerMaxHp, this.playerHp + heal);
+        this.updateHUD();
+      }
+    }
+
     // Golge mana drain — seviye bazli dinamik maliyet
     const aliveCount = this.shadowArmy.getAliveCount();
     if (aliveCount > 0) {
@@ -710,7 +724,11 @@ export class TestScene implements GameScene {
 
   private updateHUD(): void {
     this.game.hud.setHP(this.playerHp, this.playerMaxHp);
-    this.game.hud.setMP(this.playerMp, this.playerMaxMp);
+    const mpRegen = this.levelSystem.getMpRegen();
+    const mpDrain = this.shadowArmy.getAliveCount() > 0
+      ? this.shadowArmy.getManaDrainPerSecond(this.levelSystem.level)
+      : 0;
+    this.game.hud.setMP(this.playerMp, this.playerMaxMp, mpRegen, mpDrain);
     this.game.hud.setXP(this.levelSystem.getXpPercent());
     this.game.hud.setLevel(this.levelSystem.level);
     this.game.hud.setGold(this.gold);

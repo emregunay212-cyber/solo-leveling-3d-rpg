@@ -142,6 +142,20 @@ export class SkillSystem {
     return this.skillUpgrades.get(skillId) ?? 0;
   }
 
+  // ─── Passive Buffs ───
+
+  /** HP regen: her seviye +%3 maxHP/5sn → saniyede %0.6 maxHP */
+  public getPassiveHpRegenPercent(): number {
+    const level = this.getUpgradeLevel('passive_hp_regen');
+    return level * 0.006; // %0.6 maxHP per second per level
+  }
+
+  /** Hasar azaltma: her seviye +%5 damage reduction */
+  public getPassiveDamageReduction(): number {
+    const level = this.getUpgradeLevel('passive_damage_reduce');
+    return Math.min(0.25, level * 0.05); // max %25
+  }
+
   // ─── Getters ───
 
   public getSlots(): readonly SkillState[] {

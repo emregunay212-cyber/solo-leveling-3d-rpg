@@ -213,7 +213,12 @@ export const BOOK_TO_SKILL_MAP: Readonly<Record<string, string>> = {
   'book_shadow_shield_up': 'shadowShield',
   'book_shadow_burst_up': 'shadowBurst',
   'book_sovereign_aura_up': 'sovereignAura',
+  'book_dark_regen': 'passive_hp_regen',
+  'book_iron_will': 'passive_damage_reduce',
 } as const;
+
+/** Passive kitaplar — Q/E/R/F degilse passive buff olarak kullanilir */
+export const PASSIVE_BOOK_IDS = new Set(['book_dark_regen', 'book_iron_will']);
 
 /** Skill ID → skill display bilgisi (UI icin) */
 export const SKILL_KEY_LABELS: Readonly<Record<string, string>> = {

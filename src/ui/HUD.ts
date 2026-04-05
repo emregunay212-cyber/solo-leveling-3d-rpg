@@ -336,10 +336,19 @@ export class HUD {
     }
   }
 
-  public setMP(current: number, max: number): void {
+  public setMP(current: number, max: number, regenPerSec = 0, drainPerSec = 0): void {
     const pct = Math.max(0, Math.min(100, (current / max) * 100));
     this.mpFill.style.width = `${pct}%`;
-    this.mpText.textContent = `${Math.ceil(current)} / ${max}`;
+
+    if (drainPerSec > 0) {
+      const net = regenPerSec - drainPerSec;
+      const sign = net >= 0 ? '+' : '';
+      this.mpText.innerHTML =
+        `${Math.ceil(current)} / ${max}` +
+        ` <span style="font-size:9px;color:${net >= 0 ? '#4ade80' : '#ff6b6b'}">(${sign}${net.toFixed(1)}/s)</span>`;
+    } else {
+      this.mpText.textContent = `${Math.ceil(current)} / ${max}`;
+    }
   }
 
   public setXP(percent: number): void {

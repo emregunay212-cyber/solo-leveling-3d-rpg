@@ -230,17 +230,8 @@ export class ShadowUI {
     }
   }
 
-  public updateCount(activeCount: number, drainPerSecond: number, regenPerSecond: number): void {
-    if (activeCount === 0) {
-      this.countText.textContent = '0';
-    } else {
-      const net = regenPerSecond - drainPerSecond;
-      const sign = net >= 0 ? '+' : '';
-      this.countText.innerHTML =
-        `${activeCount} ◆ <span style="color:#4ade80">+${regenPerSecond.toFixed(1)}</span>` +
-        ` / <span style="color:#ff6b6b">-${drainPerSecond.toFixed(1)}</span>` +
-        ` <span style="color:${net >= 0 ? '#4ade80' : '#ff6b6b'}">(${sign}${net.toFixed(1)})</span> MP/s`;
-    }
+  public updateCount(activeCount: number): void {
+    this.countText.textContent = `${activeCount}`;
   }
 
   public setExtractMode(active: boolean): void {
