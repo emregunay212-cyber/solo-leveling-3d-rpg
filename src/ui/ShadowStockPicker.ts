@@ -128,7 +128,7 @@ export class ShadowStockPicker {
     `;
     document.body.appendChild(this.container);
 
-    const closeBtn = document.getElementById('ssp-close')!;
+    const closeBtn = this.container.querySelector('#ssp-close') as HTMLButtonElement;
     closeBtn.addEventListener('click', () => this.close());
   }
 
@@ -146,10 +146,10 @@ export class ShadowStockPicker {
       soldier: 'Asker', knight: 'Sovalye', elite: 'Elit', commander: 'Komutan',
     };
 
-    const headerEl = document.getElementById('ssp-header')!;
+    const headerEl = this.container.querySelector('#ssp-header') as HTMLDivElement;
     headerEl.textContent = `Slot ${slotIndex + 1} \u2014 ${slot.enemyDefId ?? '?'}  (${slot.count} golge)`;
 
-    const entriesEl = document.getElementById('ssp-entries')!;
+    const entriesEl = this.container.querySelector('#ssp-entries') as HTMLDivElement;
     entriesEl.innerHTML = '';
 
     for (let i = 0; i < slot.profiles.length; i++) {

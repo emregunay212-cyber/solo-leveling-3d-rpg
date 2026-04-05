@@ -153,14 +153,14 @@ export class StatsUI {
     // Button handlers
     const stats: ('str' | 'vit' | 'agi' | 'int')[] = ['str', 'vit', 'agi', 'int'];
     for (const stat of stats) {
-      document.getElementById(`btn-${stat}`)!.addEventListener('click', () => {
+      (this.container.querySelector(`#btn-${stat}`) as HTMLButtonElement).addEventListener('click', () => {
         this.levelSystem.distributeStatPoint(stat);
         this.refresh();
         if (this.onStatChanged) this.onStatChanged();
       });
     }
 
-    document.getElementById('stats-close')!.addEventListener('click', () => this.toggle());
+    (this.container.querySelector('#stats-close') as HTMLButtonElement).addEventListener('click', () => this.toggle());
 
     // P key to toggle
     window.addEventListener('keydown', (e) => {
@@ -180,23 +180,23 @@ export class StatsUI {
 
   public refresh(): void {
     const ls = this.levelSystem;
-    (document.getElementById('stats-level') as HTMLSpanElement).textContent = `Seviye: ${ls.level}`;
-    (document.getElementById('stats-xp') as HTMLSpanElement).textContent = `XP: ${ls.xp} / ${ls.xpToNext}`;
-    (document.getElementById('stats-points') as HTMLSpanElement).textContent = `Dagitilacak Puan: ${ls.statPoints}`;
+    (this.container.querySelector('#stats-level') as HTMLSpanElement).textContent = `Seviye: ${ls.level}`;
+    (this.container.querySelector('#stats-xp') as HTMLSpanElement).textContent = `XP: ${ls.xp} / ${ls.xpToNext}`;
+    (this.container.querySelector('#stats-points') as HTMLSpanElement).textContent = `Dagitilacak Puan: ${ls.statPoints}`;
 
     const cap = ls.STAT_CAP;
-    (document.getElementById('stat-str') as HTMLDivElement).textContent = `${ls.str}/${cap}`;
-    (document.getElementById('stat-vit') as HTMLDivElement).textContent = `${ls.vit}/${cap}`;
-    (document.getElementById('stat-agi') as HTMLDivElement).textContent = `${ls.agi}/${cap}`;
-    (document.getElementById('stat-int') as HTMLDivElement).textContent = `${ls.int}/${cap}`;
+    (this.container.querySelector('#stat-str') as HTMLDivElement).textContent = `${ls.str}/${cap}`;
+    (this.container.querySelector('#stat-vit') as HTMLDivElement).textContent = `${ls.vit}/${cap}`;
+    (this.container.querySelector('#stat-agi') as HTMLDivElement).textContent = `${ls.agi}/${cap}`;
+    (this.container.querySelector('#stat-int') as HTMLDivElement).textContent = `${ls.int}/${cap}`;
 
     const hasPoints = ls.statPoints > 0;
-    (document.getElementById('btn-str') as HTMLButtonElement).disabled = !hasPoints || ls.str >= cap;
-    (document.getElementById('btn-vit') as HTMLButtonElement).disabled = !hasPoints || ls.vit >= cap;
-    (document.getElementById('btn-agi') as HTMLButtonElement).disabled = !hasPoints || ls.agi >= cap;
-    (document.getElementById('btn-int') as HTMLButtonElement).disabled = !hasPoints || ls.int >= cap;
+    (this.container.querySelector('#btn-str') as HTMLButtonElement).disabled = !hasPoints || ls.str >= cap;
+    (this.container.querySelector('#btn-vit') as HTMLButtonElement).disabled = !hasPoints || ls.vit >= cap;
+    (this.container.querySelector('#btn-agi') as HTMLButtonElement).disabled = !hasPoints || ls.agi >= cap;
+    (this.container.querySelector('#btn-int') as HTMLButtonElement).disabled = !hasPoints || ls.int >= cap;
 
-    (document.getElementById('stats-derived') as HTMLDivElement).innerHTML = `
+    (this.container.querySelector('#stats-derived') as HTMLDivElement).innerHTML = `
       Saldiri: ${ls.getAttackDamage()} | Maks HP: ${ls.getMaxHp()} | Maks MP: ${ls.getMaxMp()}<br>
       Kritik Sans: %${(ls.getCritChance() * 100).toFixed(1)} | Saldiri Hizi: x${ls.getAttackSpeed().toFixed(1)} | Hiz: ${ls.getMoveSpeed().toFixed(1)}<br>
       Savunma: ${ls.getDefense().toFixed(0)} | Pasif Azaltma: %${(ls.getDamageReduction() * 100).toFixed(1)}<br>

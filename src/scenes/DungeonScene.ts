@@ -118,6 +118,9 @@ export class DungeonScene implements GameScene {
   // ═══════════════════════════════════════════
 
   async onLoad(): Promise<void> {
+    // Onceki calismanin kalintilarini temizle (tekrar giriste)
+    this.cleanupPreviousRun();
+
     const scene = this.game.engine.scene;
     scene.collisionsEnabled = true;
 
@@ -133,6 +136,59 @@ export class DungeonScene implements GameScene {
     this.shadowSelection.setEnemies(this.enemies);
 
     eventBus.emit('dungeon:enter', { rank: this.rank });
+  }
+
+  /**
+   * Onceki dungeon calismasindan kalan kaynaklari temizle.
+   * SceneManager sadece onExit cagirdigi icin onDispose cagrilmaz —
+   * bu yuzden tekrar giriste eski kaynaklar elle temizlenmeli.
+   */
+  private cleanupPreviousRun(): void {
+    // Eski event listener'i kaldir
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler);
+      this.keyHandler = null;
+    }
+
+    // Eski mesh ve fizik nesnelerini temizle
+    this.meshes.forEach(m => m.dispose());
+    this.meshes = [];
+    this.aggregates.forEach(a => a.dispose());
+    this.aggregates = [];
+
+    // Eski dusmanlari temizle
+    this.enemies.forEach(e => e.dispose());
+    this.enemies = [];
+
+    // Eski portallari temizle
+    if (this.victoryPortal) {
+      this.victoryPortal.dispose();
+      this.victoryPortal = null;
+    }
+
+    // UI temizligi — eski DOM elemanlarini kaldir
+    this.game.player?.dispose();
+    this.game.playerCamera?.dispose();
+    this.game.hud?.dispose();
+    this.game.damageNumbers?.dispose();
+    this.clickIndicator?.dispose();
+    this.deathScreen?.dispose();
+    this.statsUI?.dispose();
+    this.skillBar?.dispose();
+    this.skillEffects?.dispose();
+    this.shadowArmy?.dispose();
+    this.shadowSelection?.dispose();
+    this.shadowUI?.dispose();
+
+    // Boss state sifirla
+    this.bossSpawnTimer = -1;
+    this.bossSpawned = false;
+
+    // Oyuncu state sifirla
+    this.playerAlive = true;
+    this.mpRegenAccum = 0;
+    this.hpRegenAccum = 0;
+    this.shadowDrainAccum = 0;
   }
 
   onEnter(): void {}

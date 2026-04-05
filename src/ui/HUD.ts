@@ -312,16 +312,16 @@ export class HUD {
 
     document.body.appendChild(this.container);
 
-    this.hpFill = document.getElementById('hud-hp-fill') as HTMLDivElement;
-    this.mpFill = document.getElementById('hud-mp-fill') as HTMLDivElement;
-    this.xpFill = document.getElementById('hud-xp-fill') as HTMLDivElement;
-    this.hpText = document.getElementById('hud-hp-text') as HTMLSpanElement;
-    this.mpText = document.getElementById('hud-mp-text') as HTMLSpanElement;
-    this.levelText = document.getElementById('hud-level') as HTMLSpanElement;
-    this.goldText = document.getElementById('hud-gold') as HTMLSpanElement;
-    this.comboIndicator = document.getElementById('hud-combo') as HTMLDivElement;
-    this.blockIndicator = document.getElementById('hud-block') as HTMLDivElement;
-    this.xpPopup = document.getElementById('hud-xp-popup') as HTMLDivElement;
+    this.hpFill = this.container.querySelector('#hud-hp-fill') as HTMLDivElement;
+    this.mpFill = this.container.querySelector('#hud-mp-fill') as HTMLDivElement;
+    this.xpFill = this.container.querySelector('#hud-xp-fill') as HTMLDivElement;
+    this.hpText = this.container.querySelector('#hud-hp-text') as HTMLSpanElement;
+    this.mpText = this.container.querySelector('#hud-mp-text') as HTMLSpanElement;
+    this.levelText = this.container.querySelector('#hud-level') as HTMLSpanElement;
+    this.goldText = this.container.querySelector('#hud-gold') as HTMLSpanElement;
+    this.comboIndicator = this.container.querySelector('#hud-combo') as HTMLDivElement;
+    this.blockIndicator = this.container.querySelector('#hud-block') as HTMLDivElement;
+    this.xpPopup = this.container.querySelector('#hud-xp-popup') as HTMLDivElement;
   }
 
   public setHP(current: number, max: number): void {

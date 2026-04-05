@@ -202,12 +202,12 @@ export class ShadowUI {
     `;
 
     document.body.appendChild(this.container);
-    this.countText = document.getElementById('shadow-count') as HTMLSpanElement;
-    this.extractModeIndicator = document.getElementById('extract-mode') as HTMLDivElement;
-    this.modeIndicator = document.getElementById('shadow-mode') as HTMLSpanElement;
+    this.countText = this.container.querySelector('#shadow-count') as HTMLSpanElement;
+    this.extractModeIndicator = this.container.querySelector('#extract-mode') as HTMLDivElement;
+    this.modeIndicator = this.container.querySelector('#shadow-mode') as HTMLSpanElement;
 
     // 4 stok slotu
-    const slotsContainer = document.getElementById('soul-slots')!;
+    const slotsContainer = this.container.querySelector('#soul-slots')!;
     for (let i = 0; i < 4; i++) {
       const slot = document.createElement('div');
       slot.className = 'soul-slot';
@@ -260,11 +260,11 @@ export class ShadowUI {
     for (let i = 0; i < 4; i++) {
       const slot = slots[i];
       const el = this.slotElements[i];
-      const nameEl = document.getElementById(`soul-name-${i}`)!;
-      const countEl = document.getElementById(`soul-count-${i}`)!;
-      const hpEl = document.getElementById(`soul-hp-${i}`)!;
-      const rankEl = document.getElementById(`soul-rank-${i}`)!;
-      const bossEl = document.getElementById(`soul-boss-${i}`)!;
+      const nameEl = this.container.querySelector(`#soul-name-${i}`) as HTMLSpanElement;
+      const countEl = this.container.querySelector(`#soul-count-${i}`) as HTMLSpanElement;
+      const hpEl = this.container.querySelector(`#soul-hp-${i}`) as HTMLSpanElement;
+      const rankEl = this.container.querySelector(`#soul-rank-${i}`) as HTMLSpanElement;
+      const bossEl = this.container.querySelector(`#soul-boss-${i}`) as HTMLSpanElement;
 
       if (slot && slot.count > 0 && slot.enemyDefId) {
         el.classList.add('filled');

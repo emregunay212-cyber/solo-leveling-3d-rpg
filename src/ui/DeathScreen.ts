@@ -83,11 +83,14 @@ export class DeathScreen {
     `;
     document.body.appendChild(this.container);
 
-    document.getElementById('death-respawn-here')!.addEventListener('click', () => {
+    const respawnHereBtn = this.container.querySelector('#death-respawn-here') as HTMLButtonElement;
+    const respawnStartBtn = this.container.querySelector('#death-respawn-start') as HTMLButtonElement;
+
+    respawnHereBtn.addEventListener('click', () => {
       this.hide();
       if (this.onRespawnHere) this.onRespawnHere();
     });
-    document.getElementById('death-respawn-start')!.addEventListener('click', () => {
+    respawnStartBtn.addEventListener('click', () => {
       this.hide();
       if (this.onRespawnStart) this.onRespawnStart();
     });
