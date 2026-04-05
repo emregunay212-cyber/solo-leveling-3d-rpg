@@ -288,6 +288,34 @@ export class DungeonScene implements GameScene {
       completed,
       rewards,
     });
+
+    // Tum kaynaklari temizle (geri donuste onLoad tekrar olusturur)
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler);
+      this.keyHandler = null;
+    }
+    this.meshes.forEach(m => m.dispose());
+    this.meshes = [];
+    this.aggregates.forEach(a => a.dispose());
+    this.aggregates = [];
+    this.enemies.forEach(e => e.dispose());
+    this.enemies = [];
+    // Boss enemy dungeonManager uzerinden yonetiliyor, enemies[] icinde
+    this.game.player?.dispose();
+    this.game.playerCamera?.dispose();
+    this.game.hud?.dispose();
+    this.game.damageNumbers?.dispose();
+    this.clickIndicator?.dispose();
+    this.deathScreen?.dispose();
+    this.statsUI?.dispose();
+    this.skillBar?.dispose();
+    this.skillEffects?.dispose();
+    this.shadowArmy?.dispose();
+    this.shadowSelection?.dispose();
+    this.shadowUI?.dispose();
+    if (this.exitPortal) { this.exitPortal.dispose(); }
+    if (this.victoryPortal) { this.victoryPortal.dispose(); this.victoryPortal = null; }
+    // DungeonHUD henuz field olarak tanimlanmamis — ilerde eklenecek
   }
 
   onDispose(): void {

@@ -937,7 +937,36 @@ export class TestScene implements GameScene {
     this.portalMesh = torus;
   }
 
-  onExit(): void {}
+  onExit(): void {
+    // Sahne degistiginde tum kaynaklari temizle (geri donuste onLoad tekrar olusturur)
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler);
+      this.keyHandler = null;
+    }
+    this.meshes.forEach(m => m.dispose());
+    this.meshes = [];
+    this.aggregates.forEach(a => a.dispose());
+    this.aggregates = [];
+    this.enemies.forEach(e => e.dispose());
+    this.enemies = [];
+    this.game.player?.dispose();
+    this.game.playerCamera?.dispose();
+    this.game.hud?.dispose();
+    this.game.damageNumbers?.dispose();
+    this.clickIndicator?.dispose();
+    this.deathScreen?.dispose();
+    this.statsUI?.dispose();
+    this.respawnManager?.clear();
+    this.skillBar?.dispose();
+    this.skillEffects?.dispose();
+    this.shadowArmy?.dispose();
+    this.shadowSelection?.dispose();
+    this.shadowUI?.dispose();
+    this.shadowManageUI?.dispose();
+    this.shadowStockPicker?.dispose();
+    this.dungeonSelectUI?.dispose();
+    disposeDevConsole();
+  }
 
   onDispose(): void {
     if (this.keyHandler) {
