@@ -533,6 +533,7 @@ export class DungeonScene implements GameScene {
     this.game.combatSystem.registerTarget(enemy);
 
     enemy.setOnDeath((e) => {
+      this.game.combatSystem.unregisterTarget(enemy);
       this.dungeonManager.addXp(e.def.xpReward);
       this.dungeonManager.addGold(e.def.goldReward);
       this.dropSystem.rollDrops(typeKey, e.def.level);
@@ -591,6 +592,7 @@ export class DungeonScene implements GameScene {
     this.game.combatSystem.registerTarget(boss);
 
     boss.setOnDeath((e) => {
+      this.game.combatSystem.unregisterTarget(boss);
       this.dungeonManager.addXp(e.def.xpReward);
       this.dungeonManager.addGold(e.def.goldReward);
       this.updateHUD();

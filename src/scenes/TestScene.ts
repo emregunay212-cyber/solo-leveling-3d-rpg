@@ -311,6 +311,7 @@ export class TestScene implements GameScene {
     this.game.combatSystem.registerTarget(enemy);
 
     enemy.setOnDeath((e) => {
+      this.game.combatSystem.unregisterTarget(enemy);
       this.levelSystem.addXp(e.def.xpReward);
       this.gold += e.def.goldReward;
 
