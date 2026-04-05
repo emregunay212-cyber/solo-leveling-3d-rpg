@@ -34,17 +34,17 @@ export function calculateShadowStats(
     ? getBossStatPercent(profile?.rank ?? 'soldier')
     : SHADOW_ENHANCEMENT.normalStatPercent;
 
-  // Statlar oyuncu statlarindan yuzdeli turetilir
+  // Derived stat'lardan yuzde kopyalama — ekipman bonuslari dahil
   // Minimum: dusman def degerlerinin bir yuzdesini taban olarak kullan
-  const rawMaxHp = Math.max(20, Math.round(playerStats.vit * pct * 8));
-  const rawDamage = Math.max(1, Math.round(playerStats.str * pct * 2));
+  const rawMaxHp = Math.max(20, Math.round(playerStats.maxHp * pct));
+  const rawDamage = Math.max(1, Math.round(playerStats.attackDamage * pct));
   const maxHp = Math.max(rawMaxHp, Math.round(enemyDef.hp * 0.3));
   const damage = Math.max(rawDamage, Math.round(enemyDef.damage * 0.5));
-  const defense = Math.round(playerStats.vit * pct * 1.5);
+  const defense = Math.round(playerStats.defense * pct);
   const blockChance = 0; // sadece skill'lerden gelir
-  const attackCooldown: number = Math.max(0.5, 2.0 - playerStats.agi * pct * 0.02);
-  const chaseSpeed: number = 4.0 + playerStats.agi * pct * 0.05;
-  const patrolSpeed: number = 2.0 + playerStats.agi * pct * 0.025;
+  const attackCooldown: number = Math.max(0.5, 2.0 / (1 + playerStats.attackSpeed * pct * 0.3));
+  const chaseSpeed: number = 4.0 + playerStats.moveSpeed * pct * 0.3;
+  const patrolSpeed: number = 2.0 + playerStats.moveSpeed * pct * 0.15;
 
   return { maxHp, damage, defense, blockChance, attackCooldown, chaseSpeed, patrolSpeed };
 }

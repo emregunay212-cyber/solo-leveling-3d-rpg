@@ -778,6 +778,13 @@ export class TestScene implements GameScene {
       vit: this.levelSystem.vit,
       agi: this.levelSystem.agi,
       int: this.levelSystem.int,
+      maxHp: this.levelSystem.getMaxHp(),
+      maxMp: this.levelSystem.getMaxMp(),
+      attackDamage: this.levelSystem.getAttackDamage(),
+      critChance: this.levelSystem.getCritChance(),
+      attackSpeed: this.levelSystem.getAttackSpeed(),
+      moveSpeed: this.levelSystem.getMoveSpeed(),
+      defense: this.levelSystem.getDefense(),
     };
   }
 

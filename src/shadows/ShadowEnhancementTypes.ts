@@ -78,6 +78,14 @@ export interface PlayerStats {
   readonly vit: number;
   readonly agi: number;
   readonly int: number;
+  // Derived (hesaplanmis) statlar — ekipman bonuslari dahil
+  readonly maxHp: number;
+  readonly maxMp: number;
+  readonly attackDamage: number;
+  readonly critChance: number;
+  readonly attackSpeed: number;
+  readonly moveSpeed: number;
+  readonly defense: number;
 }
 
 // ─── HESAPLANMIS NIHAI STATLAR ───

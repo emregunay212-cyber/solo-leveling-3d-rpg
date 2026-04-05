@@ -25,7 +25,11 @@ export class ShadowManageUI {
   private visible = false;
   private activeTab: TabId = 'detail';
   private selectedUid: number | null = null;
-  private playerStats: PlayerStats = { str: 5, vit: 5, agi: 5, int: 5 };
+  private playerStats: PlayerStats = {
+    str: 5, vit: 5, agi: 5, int: 5,
+    maxHp: 120, maxMp: 55, attackDamage: 20, critChance: 0.075,
+    attackSpeed: 1.1, moveSpeed: 5.25, defense: 9,
+  };
 
   private profileManager: ShadowProfileManager;
   private inventory: ShadowInventory;
