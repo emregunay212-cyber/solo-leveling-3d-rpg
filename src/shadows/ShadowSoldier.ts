@@ -41,6 +41,7 @@ export class ShadowSoldier {
   private fillMat: StandardMaterial;
   private hpBarBgMat!: StandardMaterial;
   private isDead = false;
+  private isStocked = false;
   private damageNumbers: DamageNumbers | null = null;
   private isSelected = false;
   private profile: ShadowProfile | null = null;
@@ -342,6 +343,10 @@ export class ShadowSoldier {
   }
 
   public getIsSelected(): boolean { return this.isSelected; }
+
+  /** Stoklandı olarak işaretle — profil silinmesini engeller */
+  public markAsStocked(): void { this.isStocked = true; }
+  public getIsStocked(): boolean { return this.isStocked; }
 
   /** Oyuncu tarafindan zorla hedef ata */
   public forceTarget(enemy: Enemy): void {
