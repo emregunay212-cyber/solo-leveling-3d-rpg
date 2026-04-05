@@ -226,6 +226,42 @@ export class ShadowArmy {
     return true;
   }
 
+  /** Belirli bir profil index'inden stoktan cagir (picker UI icin) */
+  public summonFromStockByIndex(
+    slotIndex: number,
+    profileIndex: number,
+    position: Vector3,
+  ): boolean {
+    if (slotIndex < 0 || slotIndex >= 4) return false;
+
+    const slot = this.soulSlots[slotIndex];
+    if (!slot.enemyDef || profileIndex < 0 || profileIndex >= slot.profiles.length) return false;
+
+    const def = slot.enemyDef;
+    const profile = slot.profiles[profileIndex];
+    const hpPercent = slot.hpPercents[profileIndex];
+
+    // Diziden index ile cikar (pop degil)
+    slot.profiles.splice(profileIndex, 1);
+    slot.hpPercents.splice(profileIndex, 1);
+    slot.count = slot.hpPercents.length;
+
+    if (slot.count <= 0) {
+      slot.enemyDefId = null;
+      slot.enemyDef = null;
+    }
+
+    const shadow = new ShadowSoldier(this.scene, position, def, this.playerStats, profile);
+    if (!profile) {
+      shadow.setHpPercent(hpPercent);
+    }
+    shadow.setMode(this.armyMode);
+    if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
+    this.bindShadowOnKill(shadow);
+    this.shadows.push(shadow);
+    return true;
+  }
+
   public getSoulSlots(): readonly SoulSlot[] {
     return this.soulSlots;
   }

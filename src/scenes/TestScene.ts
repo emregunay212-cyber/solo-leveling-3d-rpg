@@ -35,6 +35,7 @@ import { ShadowProfileManager } from '../shadows/ShadowProfileManager';
 import { ShadowInventory } from '../systems/ShadowInventory';
 import { DropSystem } from '../systems/DropSystem';
 import { ShadowManageUI } from '../ui/ShadowManageUI';
+import { ShadowStockPicker } from '../ui/ShadowStockPicker';
 import { BOOK_TO_SKILL_MAP } from '../data/shadowSkillBooks';
 import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
 import { SKILLS, MP, SHADOW } from '../config/GameConfig';
@@ -65,6 +66,7 @@ export class TestScene implements GameScene {
   private shadowInventory!: ShadowInventory;
   private dropSystem!: DropSystem;
   private shadowManageUI!: ShadowManageUI;
+  private shadowStockPicker!: ShadowStockPicker;
 
   // Player state
   private playerHp = 100;
@@ -194,6 +196,7 @@ export class TestScene implements GameScene {
       this.shadowInventory,
       (name: string) => ENEMY_DEFS[name] ?? null,
     );
+    this.shadowStockPicker = new ShadowStockPicker();
 
     // Kitap kullanma callback'i — envanterdeki kitabi tuketip skill'i guclendirir
     this.shadowManageUI.setOnUseBook((bookId: string): boolean => {
@@ -402,24 +405,54 @@ export class TestScene implements GameScene {
       return;
     }
 
+    // Picker acikken yeni summon girisi engelle
+    if (this.shadowStockPicker.isOpen()) return;
+
     for (let i = 0; i < 4; i++) {
       const isDown = this.game.input.isKeyDown(this.STOCK_KEYS[i]);
       if (isDown && !this.stockKeyStates[i]) {
-        // Alt + sayi tusu → stoktan cagir
-        const playerPos = this.game.player.getPosition().clone();
-        // Oyuncunun biraz arkasinda spawn et
-        const offset = this.game.player.getForwardDirection().scale(-SHADOW.summonOffsetDistance);
-        const spawnPos = playerPos.add(offset);
-        spawnPos.y = 0;
+        const slots = this.shadowArmy.getSoulSlots();
+        const slot = slots[i];
+        if (!slot || !slot.enemyDef || slot.count <= 0) {
+          this.stockKeyStates[i] = isDown;
+          continue;
+        }
 
-        const success = this.shadowArmy.summonFromStock(
-          i, spawnPos, this.levelSystem.level,
-        );
-        if (success) {
-          this.game.damageNumbers.spawn(
-            spawnPos.add(new Vector3(0, 2, 0)),
-            0, 'arise',
+        if (slot.count === 1) {
+          // Tek golge varsa direkt cagir (mevcut davranis)
+          const playerPos = this.game.player.getPosition().clone();
+          const offset = this.game.player.getForwardDirection().scale(-SHADOW.summonOffsetDistance);
+          const spawnPos = playerPos.add(offset);
+          spawnPos.y = 0;
+
+          const success = this.shadowArmy.summonFromStock(
+            i, spawnPos, this.levelSystem.level,
           );
+          if (success) {
+            this.game.damageNumbers.spawn(
+              spawnPos.add(new Vector3(0, 2, 0)),
+              0, 'arise',
+            );
+          }
+        } else {
+          // 2+ golge varsa picker popup ac
+          const slotIndex = i;
+          this.shadowStockPicker.open(slot, slotIndex, (profileIndex: number) => {
+            const playerPos = this.game.player.getPosition().clone();
+            const offset = this.game.player.getForwardDirection().scale(-SHADOW.summonOffsetDistance);
+            const spawnPos = playerPos.add(offset);
+            spawnPos.y = 0;
+
+            const success = this.shadowArmy.summonFromStockByIndex(
+              slotIndex, profileIndex, spawnPos,
+            );
+            if (success) {
+              this.game.damageNumbers.spawn(
+                spawnPos.add(new Vector3(0, 2, 0)),
+                0, 'arise',
+              );
+            }
+          });
         }
       }
       this.stockKeyStates[i] = isDown;
@@ -840,6 +873,7 @@ export class TestScene implements GameScene {
     this.shadowSelection?.dispose();
     this.shadowUI?.dispose();
     this.shadowManageUI?.dispose();
+    this.shadowStockPicker?.dispose();
     disposeDevConsole();
   }
 }

@@ -5,6 +5,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { Scene } from '@babylonjs/core/scene';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { Ray } from '@babylonjs/core/Culling/ray';
+import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import { ShadowAI } from './ShadowAI';
 import type { ShadowCombatMode } from './ShadowAI';
 import { ShadowSkillRunner } from './ShadowSkillRunner';
@@ -46,6 +47,9 @@ export class ShadowSoldier {
   public finalStats: ShadowFinalStats | null = null;
   private skillRunner: ShadowSkillRunner | null = null;
   private onKillCallback: ((uid: number) => void) | null = null;
+  private nameLabel: Mesh;
+  private nameLabelTexture: DynamicTexture;
+  private nameLabelMat: StandardMaterial;
 
   constructor(
     scene: Scene,
@@ -111,6 +115,36 @@ export class ShadowSoldier {
     this.fillMat.disableLighting = true;
     this.fillMat.backFaceCulling = false;
     this.hpBarFill.material = this.fillMat;
+
+    // Isim etiketi — HP barin ustunde kucuk billboard plane
+    const labelPlane = MeshBuilder.CreatePlane(`shadowLabel_${this.id}`, { width: 1.2, height: 0.3 }, scene);
+    labelPlane.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    labelPlane.isPickable = false;
+    this.nameLabel = labelPlane;
+
+    const labelTex = new DynamicTexture(`shadowLabelTex_${this.id}`, { width: 256, height: 64 }, scene);
+    this.nameLabelTexture = labelTex;
+    const labelMat = new StandardMaterial(`shadowLabelMat_${this.id}`, scene);
+    labelMat.diffuseTexture = labelTex;
+    labelMat.emissiveTexture = labelTex;
+    labelMat.opacityTexture = labelTex;
+    labelMat.disableLighting = true;
+    labelMat.backFaceCulling = false;
+    this.nameLabelMat = labelMat;
+    labelPlane.material = labelMat;
+
+    // Etiket metnini ciz
+    const labelCtx = labelTex.getContext() as CanvasRenderingContext2D;
+    labelCtx.clearRect(0, 0, 256, 64);
+    labelCtx.font = 'bold 24px Arial';
+    labelCtx.textAlign = 'center';
+    labelCtx.textBaseline = 'middle';
+    labelCtx.fillStyle = '#c084fc';
+    const displayName = profile?.nickname ?? sourceDef.name;
+    const rankSuffix = profile?.isBoss ? ` [${profile.rank[0].toUpperCase()}]` : '';
+    const bossPrefix = profile?.isBoss ? '\u2605 ' : '';
+    labelCtx.fillText(bossPrefix + displayName + rankSuffix, 128, 32);
+    labelTex.update();
 
     // Yetenek sistemi — profilden veya kaynak dusmanin sabit yeteneklerinden
     const skillIds = this.profile?.shadowSkillIds ?? sourceDef.shadowSkillIds ?? [];
@@ -256,6 +290,11 @@ export class ShadowSoldier {
     this.hpBarBg.position.y = this.mesh.position.y + ENEMY_VISUAL.hpBarYOffsetMultiplier * scale;
     this.hpBarBg.position.z = this.mesh.position.z;
 
+    // Isim etiketi — HP barin 0.15 yukari
+    this.nameLabel.position.x = this.mesh.position.x;
+    this.nameLabel.position.y = this.hpBarBg.position.y + 0.15;
+    this.nameLabel.position.z = this.mesh.position.z;
+
     // Yonu dusmana cevir
     if (vel.lengthSquared() > 0.01) {
       this.mesh.rotation.y = Math.atan2(vel.x, vel.z);
@@ -341,6 +380,7 @@ export class ShadowSoldier {
     this.ai.onDeath();
     this.mesh.isVisible = false;
     this.hpBarBg.isVisible = false;
+    this.nameLabel.isVisible = false;
   }
 
   public isAlive(): boolean { return !this.isDead; }
@@ -382,5 +422,8 @@ export class ShadowSoldier {
     this.mat.dispose();
     this.fillMat.dispose();
     this.hpBarBgMat.dispose();
+    this.nameLabel.dispose();
+    this.nameLabelTexture.dispose();
+    this.nameLabelMat.dispose();
   }
 }
