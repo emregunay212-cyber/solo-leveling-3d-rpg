@@ -69,11 +69,11 @@ export class ShadowProfileManager {
   // ─── OLDURME & RUTBE ───
 
   /** Oldurme sayacini artir ve rutbe terfisi kontrol et — sadece boss golgeler rank atlayabilir */
-  incrementKills(uid: number): ShadowProfile | null {
+  incrementKills(uid: number, killValue = 1): ShadowProfile | null {
     const profile = this.profiles.get(uid);
     if (!profile) return null;
 
-    const newKills = profile.kills + 1;
+    const newKills = profile.kills + killValue;
     // Sadece boss golgeler rank atlayabilir
     const newRank = profile.isBoss ? this.calculateRank(newKills) : 'soldier' as ShadowRank;
     const updated: ShadowProfile = { ...profile, kills: newKills, rank: newRank };

@@ -274,9 +274,11 @@ export class ShadowArmy {
 
   /** Golge askerine kill callback'i bagla — profileManager uzerinden kill sayacini arttirir */
   private bindShadowOnKill(shadow: ShadowSoldier): void {
-    shadow.setOnKill((uid: number) => {
+    shadow.setOnKill((uid: number, enemyLevel: number, isBoss: boolean) => {
       if (this.profileManager) {
-        this.profileManager.incrementKills(uid);
+        // Kill degeri: boss = level*3, normal = level bazli
+        const killValue = isBoss ? enemyLevel * 3 : Math.max(1, Math.ceil(enemyLevel / 2));
+        this.profileManager.incrementKills(uid, killValue);
       }
     });
   }

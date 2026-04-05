@@ -47,7 +47,7 @@ export class ShadowSoldier {
   private profile: ShadowProfile | null = null;
   public finalStats: ShadowFinalStats | null = null;
   private skillRunner: ShadowSkillRunner | null = null;
-  private onKillCallback: ((uid: number) => void) | null = null;
+  private onKillCallback: ((uid: number, enemyLevel: number, isBoss: boolean) => void) | null = null;
   private nameLabel: Mesh;
   private nameLabelTexture: DynamicTexture;
   private nameLabelMat: StandardMaterial;
@@ -264,7 +264,7 @@ export class ShadowSoldier {
             this.skillRunner.onKill();
           }
           if (this.profile && this.onKillCallback) {
-            this.onKillCallback(this.profile.uid);
+            this.onKillCallback(this.profile.uid, target.def.level, target.def.isBoss);
           }
         }
       }
@@ -410,7 +410,7 @@ export class ShadowSoldier {
   }
 
   /** Kill callback'i ayarla — ShadowArmy profil yoneticisine baglar */
-  public setOnKill(cb: (uid: number) => void): void {
+  public setOnKill(cb: (uid: number, enemyLevel: number, isBoss: boolean) => void): void {
     this.onKillCallback = cb;
   }
 
