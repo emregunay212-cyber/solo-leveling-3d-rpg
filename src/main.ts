@@ -32,11 +32,8 @@ async function main() {
     if (loadingBar) loadingBar.style.width = '100%';
     if (loadingText) loadingText.textContent = 'Hazir!';
 
-    (window as any).__game = game;
-
-    console.log('Solo Leveling Game initialized with Havok Physics!');
-    console.log('Controls: WASD = Move, Shift = Sprint, Space = Jump, C = Dodge');
-    console.log('Camera: Right-click drag = Rotate, Scroll = Zoom');
+    // Debug erişimi (geliştirme ortami icin)
+    (window as unknown as Record<string, unknown>).__game = game;
 
   } catch (error) {
     console.error('Failed to initialize game:', error);

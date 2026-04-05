@@ -1,0 +1,513 @@
+/**
+ * Golge Yonetim Paneli
+ * Envanter, craft, dukkan ve yetenek kitaplari tab'lari.
+ * Tab key veya soul slot tiklama ile acilir.
+ */
+
+import type { ShadowProfileManager } from '../shadows/ShadowProfileManager';
+import type { ShadowInventory } from '../systems/ShadowInventory';
+import type { ShadowProfile, EquipmentSlot } from '../shadows/ShadowEnhancementTypes';
+import type { EnemyDef } from '../enemies/Enemy';
+import { EQUIPMENT_DEFS } from '../data/shadowEquipment';
+import { SKILL_BOOK_DEFS } from '../data/shadowSkillBooks';
+import { SHADOW_ENHANCEMENT } from '../config/GameConfig';
+import { calculateShadowStats } from '../shadows/ShadowStatCalculator';
+
+type TabId = 'inventory' | 'craft' | 'shop' | 'books';
+
+const RARITY_COLORS: Record<string, string> = {
+  common: '#aaa', uncommon: '#4ade80', rare: '#60a5fa', epic: '#a855f7', legendary: '#f59e0b',
+};
+const RANK_COLORS: Record<string, string> = {
+  soldier: '#aaa', knight: '#4ade80', elite: '#60a5fa', commander: '#f59e0b',
+};
+
+export class ShadowManageUI {
+  private container: HTMLDivElement;
+  private visible = false;
+  private activeTab: TabId = 'inventory';
+  private selectedUid: number | null = null;
+
+  private profileManager: ShadowProfileManager;
+  private inventory: ShadowInventory;
+  private getEnemyDef: (name: string) => EnemyDef | null;
+
+  constructor(
+    profileManager: ShadowProfileManager,
+    inventory: ShadowInventory,
+    getEnemyDef: (name: string) => EnemyDef | null,
+  ) {
+    this.profileManager = profileManager;
+    this.inventory = inventory;
+    this.getEnemyDef = getEnemyDef;
+
+    this.container = document.createElement('div');
+    this.container.id = 'shadow-manage-ui';
+    this.container.innerHTML = this.buildShell();
+    document.body.appendChild(this.container);
+    this.bindEvents();
+  }
+
+  // ─── PUBLIC API ───
+
+  public open(): void {
+    this.visible = true;
+    this.refresh();
+    this.container.classList.add('show');
+  }
+
+  public close(): void {
+    this.visible = false;
+    this.container.classList.remove('show');
+  }
+
+  public isOpen(): boolean { return this.visible; }
+
+  public toggle(): void {
+    if (this.visible) this.close(); else this.open();
+  }
+
+  public selectShadow(uid: number): void {
+    this.selectedUid = uid;
+    if (this.visible) this.refresh();
+  }
+
+  public refresh(): void {
+    this.renderShadowList();
+    this.renderRightPanel();
+    this.renderGold();
+  }
+
+  public dispose(): void { this.container.remove(); }
+
+  // ─── SHELL / STYLE ───
+
+  private buildShell(): string {
+    return `
+    <style>
+      #shadow-manage-ui {
+        position: absolute; top:0; left:0; width:100%; height:100%;
+        display:none; z-index:50; pointer-events:none;
+        font-family:'Rajdhani','Segoe UI',sans-serif;
+      }
+      #shadow-manage-ui.show { display:flex; pointer-events:all; }
+      .smu-overlay { position:absolute; top:0;left:0;width:100%;height:100%; background:rgba(0,0,0,0.6); }
+      .smu-modal {
+        position:relative; margin:auto; width:820px; max-height:85vh;
+        background:linear-gradient(135deg,rgba(10,5,20,0.95),rgba(15,5,30,0.95));
+        border:1px solid rgba(120,60,200,0.3); border-radius:8px;
+        display:flex; flex-direction:column; overflow:hidden; z-index:1;
+      }
+      .smu-header {
+        display:flex; justify-content:space-between; align-items:center;
+        padding:10px 16px; border-bottom:1px solid rgba(120,60,200,0.2);
+      }
+      .smu-title { color:#c084fc; font-size:16px; font-weight:700; letter-spacing:2px; }
+      .smu-gold { color:#f59e0b; font-size:13px; font-weight:700; }
+      .smu-close { color:rgba(255,255,255,0.4); font-size:22px; cursor:pointer; }
+      .smu-close:hover { color:#fff; }
+      .smu-body { display:flex; flex:1; overflow:hidden; min-height:400px; }
+      .smu-left {
+        width:220px; border-right:1px solid rgba(120,60,200,0.15);
+        overflow-y:auto; padding:8px;
+      }
+      .smu-right { flex:1; overflow-y:auto; padding:12px; }
+      .smu-tabs {
+        display:flex; border-top:1px solid rgba(120,60,200,0.2);
+      }
+      .smu-tab {
+        flex:1; text-align:center; padding:8px 0; cursor:pointer;
+        color:rgba(224,212,252,0.5); font-size:11px; font-weight:700;
+        letter-spacing:1px; transition:color 0.15s,background 0.15s;
+      }
+      .smu-tab:hover { color:#c084fc; background:rgba(120,60,200,0.08); }
+      .smu-tab.active { color:#c084fc; background:rgba(120,60,200,0.15);
+        border-top:2px solid #a855f7; }
+      /* Shadow list items */
+      .smu-shadow-item {
+        padding:6px 8px; cursor:pointer; border-radius:4px; margin-bottom:2px;
+        color:#e0d4fc; font-size:11px; transition:background 0.1s;
+      }
+      .smu-shadow-item:hover { background:rgba(120,60,200,0.12); }
+      .smu-shadow-item.sel { background:rgba(168,85,247,0.2); border-left:2px solid #a855f7; }
+      .smu-shadow-rank { font-size:9px; font-weight:700; margin-right:4px; }
+      .smu-group-label { color:rgba(192,132,252,0.4); font-size:9px; font-weight:700;
+        letter-spacing:1.5px; margin:8px 0 4px; text-transform:uppercase; }
+      /* Right panel sections */
+      .smu-section { margin-bottom:12px; }
+      .smu-section-title { color:rgba(192,132,252,0.6); font-size:10px; font-weight:700;
+        letter-spacing:1.5px; margin-bottom:4px; text-transform:uppercase; }
+      .smu-stat-row { display:flex; justify-content:space-between; color:#e0d4fc;
+        font-size:12px; padding:2px 0; }
+      .smu-stat-val { color:#c084fc; font-weight:700; }
+      /* Equipment slots */
+      .smu-equip-slot {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:5px 8px; background:rgba(20,8,40,0.8);
+        border:1px solid rgba(100,40,160,0.2); border-radius:4px;
+        margin-bottom:4px; cursor:pointer; transition:border-color 0.15s;
+      }
+      .smu-equip-slot:hover { border-color:rgba(168,85,247,0.5); }
+      .smu-equip-name { color:#e0d4fc; font-size:11px; }
+      .smu-equip-empty { color:rgba(255,255,255,0.25); font-size:11px; font-style:italic; }
+      /* Grid items (shop/craft/books) */
+      .smu-grid { display:flex; flex-wrap:wrap; gap:6px; }
+      .smu-card {
+        width:180px; padding:8px; background:rgba(20,8,40,0.8);
+        border:1px solid rgba(100,40,160,0.2); border-radius:4px;
+      }
+      .smu-card-name { color:#e0d4fc; font-size:12px; font-weight:600; }
+      .smu-card-desc { color:rgba(255,255,255,0.4); font-size:10px; margin:4px 0; }
+      .smu-btn {
+        display:inline-block; padding:3px 10px; font-size:10px; font-weight:700;
+        border:1px solid rgba(168,85,247,0.4); border-radius:3px;
+        background:rgba(168,85,247,0.15); color:#c084fc; cursor:pointer;
+        transition:background 0.15s;
+      }
+      .smu-btn:hover { background:rgba(168,85,247,0.3); }
+      .smu-btn.disabled { opacity:0.3; pointer-events:none; }
+      .smu-empty { color:rgba(255,255,255,0.3); font-size:12px; font-style:italic; padding:16px; }
+      .smu-skill-item { display:flex; align-items:center; gap:6px; padding:3px 0; }
+      .smu-skill-name { color:#c084fc; font-size:11px; font-weight:600; }
+    </style>
+    <div class="smu-overlay" id="smu-overlay"></div>
+    <div class="smu-modal">
+      <div class="smu-header">
+        <span class="smu-title">GOLGE YONETIMI</span>
+        <span class="smu-gold" id="smu-gold">0 G</span>
+        <span class="smu-close" id="smu-close">&times;</span>
+      </div>
+      <div class="smu-body">
+        <div class="smu-left" id="smu-left"></div>
+        <div class="smu-right" id="smu-right"></div>
+      </div>
+      <div class="smu-tabs">
+        <div class="smu-tab active" data-tab="inventory">ENVANTER</div>
+        <div class="smu-tab" data-tab="craft">CRAFT</div>
+        <div class="smu-tab" data-tab="shop">DUKKAN</div>
+        <div class="smu-tab" data-tab="books">KITAPLAR</div>
+      </div>
+    </div>`;
+  }
+
+  // ─── EVENT BINDING ───
+
+  private bindEvents(): void {
+    this.container.querySelector('#smu-close')!.addEventListener('click', () => this.close());
+    this.container.querySelector('#smu-overlay')!.addEventListener('click', () => this.close());
+
+    const tabs = this.container.querySelectorAll('.smu-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        this.activeTab = (tab as HTMLElement).dataset['tab'] as TabId;
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.renderRightPanel();
+      });
+    });
+  }
+
+  // ─── GOLD ───
+
+  private renderGold(): void {
+    const el = this.container.querySelector('#smu-gold') as HTMLSpanElement;
+    el.textContent = `${this.inventory.getGold()} G`;
+  }
+
+  // ─── LEFT PANEL: SHADOW LIST ───
+
+  private renderShadowList(): void {
+    const left = this.container.querySelector('#smu-left') as HTMLDivElement;
+    const profiles = this.profileManager.getAllProfiles();
+
+    if (profiles.length === 0) {
+      left.innerHTML = '<div class="smu-empty">Henuz golge yok</div>';
+      return;
+    }
+
+    // Group by enemyDefId
+    const groups = new Map<string, ShadowProfile[]>();
+    for (const p of profiles) {
+      const arr = groups.get(p.enemyDefId) ?? [];
+      arr.push(p);
+      groups.set(p.enemyDefId, arr);
+    }
+
+    let html = '';
+    for (const [defId, list] of groups) {
+      html += `<div class="smu-group-label">${defId} (${list.length})</div>`;
+      for (const p of list) {
+        const sel = p.uid === this.selectedUid ? ' sel' : '';
+        const rc = RANK_COLORS[p.rank] ?? '#aaa';
+        const eqCount = [p.equipment.weapon, p.equipment.shield, p.equipment.armor].filter(Boolean).length;
+        html += `<div class="smu-shadow-item${sel}" data-uid="${p.uid}">
+          <span class="smu-shadow-rank" style="color:${rc}">[${p.rank[0].toUpperCase()}]</span>
+          ${p.nickname} ${eqCount > 0 ? `<span style="color:#f59e0b;font-size:9px">+${eqCount}</span>` : ''}
+        </div>`;
+      }
+    }
+    left.innerHTML = html;
+
+    // Bind click
+    left.querySelectorAll('.smu-shadow-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const uid = parseInt((el as HTMLElement).dataset['uid'] ?? '0', 10);
+        this.selectedUid = uid;
+        this.refresh();
+      });
+    });
+  }
+
+  // ─── RIGHT PANEL ROUTER ───
+
+  private renderRightPanel(): void {
+    switch (this.activeTab) {
+      case 'inventory': this.renderInventoryTab(); break;
+      case 'craft': this.renderCraftTab(); break;
+      case 'shop': this.renderShopTab(); break;
+      case 'books': this.renderBooksTab(); break;
+    }
+  }
+
+  // ─── INVENTORY TAB (shadow detail + equip) ───
+
+  private renderInventoryTab(): void {
+    const right = this.container.querySelector('#smu-right') as HTMLDivElement;
+    const profile = this.selectedUid !== null ? this.profileManager.getProfile(this.selectedUid) : null;
+
+    if (!profile) {
+      right.innerHTML = '<div class="smu-empty">Bir golge secin</div>';
+      return;
+    }
+
+    const enemyDef = this.getEnemyDef(profile.enemyDefId);
+    const stats = enemyDef ? calculateShadowStats(enemyDef, profile) : null;
+    const rc = RANK_COLORS[profile.rank] ?? '#aaa';
+    const rankName = SHADOW_ENHANCEMENT.ranks.find(r => r.rank === profile.rank)?.name ?? profile.rank;
+
+    let html = `
+    <div class="smu-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="color:#e0d4fc;font-size:14px;font-weight:700">${profile.nickname}</span>
+        <span style="color:${rc};font-size:11px;font-weight:700">${rankName}</span>
+      </div>
+      <div class="smu-stat-row"><span>Oldurmeler</span><span class="smu-stat-val">${profile.kills}</span></div>
+      <div class="smu-stat-row"><span>HP</span><span class="smu-stat-val">${Math.round(profile.hpPercent * 100)}%</span></div>`;
+
+    if (stats) {
+      html += `
+      <div class="smu-stat-row"><span>Maks HP</span><span class="smu-stat-val">${stats.maxHp}</span></div>
+      <div class="smu-stat-row"><span>Hasar</span><span class="smu-stat-val">${stats.damage}</span></div>
+      <div class="smu-stat-row"><span>Savunma</span><span class="smu-stat-val">${stats.defense}</span></div>
+      <div class="smu-stat-row"><span>Blok</span><span class="smu-stat-val">${(stats.blockChance * 100).toFixed(0)}%</span></div>`;
+    }
+    html += '</div>';
+
+    // Equipment slots
+    html += '<div class="smu-section"><div class="smu-section-title">EKIPMAN</div>';
+    const slots: EquipmentSlot[] = ['weapon', 'shield', 'armor'];
+    const slotLabels: Record<EquipmentSlot, string> = { weapon: 'Silah', shield: 'Kalkan', armor: 'Zirh' };
+    for (const slot of slots) {
+      const itemId = profile.equipment[slot];
+      if (itemId) {
+        const def = EQUIPMENT_DEFS[itemId];
+        const rc2 = def ? RARITY_COLORS[def.rarity] ?? '#aaa' : '#aaa';
+        html += `<div class="smu-equip-slot" data-action="unequip" data-slot="${slot}">
+          <span class="smu-equip-name" style="color:${rc2}">${def?.name ?? itemId}</span>
+          <span class="smu-btn">Cikar</span>
+        </div>`;
+      } else {
+        html += `<div class="smu-equip-slot" data-action="equiplist" data-slot="${slot}">
+          <span class="smu-equip-empty">${slotLabels[slot]} — Bos</span>
+          <span class="smu-btn">Kus</span>
+        </div>`;
+      }
+    }
+    html += '</div>';
+
+    // Available equipment from inventory for empty slots
+    const invEquip = this.inventory.getEquipmentItems();
+    if (invEquip.length > 0) {
+      html += '<div class="smu-section"><div class="smu-section-title">ENVANTERDEKI EKIPMAN</div><div class="smu-grid">';
+      for (const item of invEquip) {
+        const def = EQUIPMENT_DEFS[item.id];
+        if (!def) continue;
+        const rc2 = RARITY_COLORS[def.rarity] ?? '#aaa';
+        html += `<div class="smu-card">
+          <div class="smu-card-name" style="color:${rc2}">${def.name} x${item.count}</div>
+          <div class="smu-card-desc">${def.description}</div>
+          <span class="smu-btn" data-action="equip" data-item="${item.id}" data-slot="${def.slot}">Kus</span>
+        </div>`;
+      }
+      html += '</div></div>';
+    }
+
+    // Learned skills
+    html += '<div class="smu-section"><div class="smu-section-title">YETENEKLER</div>';
+    if (profile.learnedSkillIds.length === 0) {
+      html += '<div class="smu-empty">Ogrenilmis yetenek yok</div>';
+    } else {
+      for (const sid of profile.learnedSkillIds) {
+        const sd = SKILL_BOOK_DEFS[sid];
+        html += `<div class="smu-skill-item">
+          <span class="smu-skill-name">${sd?.name ?? sid}</span>
+          <span style="color:rgba(255,255,255,0.3);font-size:10px">${sd?.description ?? ''}</span>
+        </div>`;
+      }
+    }
+    html += '</div>';
+
+    right.innerHTML = html;
+    this.bindInventoryActions(right);
+  }
+
+  private bindInventoryActions(container: HTMLElement): void {
+    container.querySelectorAll('[data-action]').forEach(el => {
+      el.addEventListener('click', () => {
+        const action = (el as HTMLElement).dataset['action'];
+        const slot = (el as HTMLElement).dataset['slot'] as EquipmentSlot | undefined;
+        const itemId = (el as HTMLElement).dataset['item'];
+
+        if (!this.selectedUid) return;
+
+        if (action === 'unequip' && slot) {
+          const result = this.profileManager.unequip(this.selectedUid, slot);
+          if (result) this.inventory.addItem(result.itemId, 'equipment');
+          this.refresh();
+        } else if (action === 'equip' && itemId && slot) {
+          if (this.inventory.removeItem(itemId)) {
+            // Unequip existing first
+            const profile = this.profileManager.getProfile(this.selectedUid);
+            if (profile?.equipment[slot]) {
+              const prev = this.profileManager.unequip(this.selectedUid, slot);
+              if (prev) this.inventory.addItem(prev.itemId, 'equipment');
+            }
+            this.profileManager.equip(this.selectedUid, itemId, slot);
+          }
+          this.refresh();
+        }
+      });
+    });
+  }
+
+  // ─── CRAFT TAB ───
+
+  private renderCraftTab(): void {
+    const right = this.container.querySelector('#smu-right') as HTMLDivElement;
+    const items = this.inventory.getEquipmentItems();
+
+    if (items.length === 0) {
+      right.innerHTML = '<div class="smu-empty">Craft icin envanterde ekipman yok</div>';
+      return;
+    }
+
+    let html = '<div class="smu-section"><div class="smu-section-title">CRAFT (3 ayni = 1 ust nadirlik)</div><div class="smu-grid">';
+    for (const item of items) {
+      const def = EQUIPMENT_DEFS[item.id];
+      if (!def) continue;
+      if (def.rarity === 'legendary') continue; // Can't upgrade legendary
+      const canCraft = item.count >= SHADOW_ENHANCEMENT.craftRatio;
+      const rc2 = RARITY_COLORS[def.rarity] ?? '#aaa';
+      html += `<div class="smu-card">
+        <div class="smu-card-name" style="color:${rc2}">${def.name} x${item.count}</div>
+        <div class="smu-card-desc">${SHADOW_ENHANCEMENT.craftRatio} adet → 1 ust nadirlik</div>
+        <span class="smu-btn${canCraft ? '' : ' disabled'}" data-craft="${item.id}">${canCraft ? 'Craft' : 'Yetersiz'}</span>
+      </div>`;
+    }
+    html += '</div></div>';
+    right.innerHTML = html;
+
+    right.querySelectorAll('[data-craft]').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = (el as HTMLElement).dataset['craft']!;
+        this.inventory.craft(id);
+        this.refresh();
+      });
+    });
+  }
+
+  // ─── SHOP TAB ───
+
+  private renderShopTab(): void {
+    const right = this.container.querySelector('#smu-right') as HTMLDivElement;
+    const shopItems = this.inventory.getShopItems();
+
+    if (shopItems.length === 0) {
+      right.innerHTML = '<div class="smu-empty">Dukkanda urun yok</div>';
+      return;
+    }
+
+    const gold = this.inventory.getGold();
+    let html = '<div class="smu-section"><div class="smu-section-title">DUKKAN</div><div class="smu-grid">';
+    for (const item of shopItems) {
+      const equipDef = EQUIPMENT_DEFS[item.id];
+      const skillDef = SKILL_BOOK_DEFS[item.id];
+      const desc = equipDef?.description ?? skillDef?.description ?? '';
+      const rarity = equipDef?.rarity;
+      const rc2 = rarity ? RARITY_COLORS[rarity] ?? '#e0d4fc' : '#c084fc';
+      const canBuy = gold >= item.price;
+      html += `<div class="smu-card">
+        <div class="smu-card-name" style="color:${rc2}">${item.name}</div>
+        <div class="smu-card-desc">${desc}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#f59e0b;font-size:11px;font-weight:700">${item.price} G</span>
+          <span class="smu-btn${canBuy ? '' : ' disabled'}" data-buy="${item.id}">Satin Al</span>
+        </div>
+      </div>`;
+    }
+    html += '</div></div>';
+    right.innerHTML = html;
+
+    right.querySelectorAll('[data-buy]').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = (el as HTMLElement).dataset['buy']!;
+        this.inventory.buyItem(id);
+        this.refresh();
+      });
+    });
+  }
+
+  // ─── BOOKS TAB ───
+
+  private renderBooksTab(): void {
+    const right = this.container.querySelector('#smu-right') as HTMLDivElement;
+    const books = this.inventory.getSkillBookItems();
+    const profile = this.selectedUid !== null ? this.profileManager.getProfile(this.selectedUid) : null;
+
+    let html = '<div class="smu-section"><div class="smu-section-title">YETENEK KITAPLARI</div>';
+
+    if (books.length === 0) {
+      html += '<div class="smu-empty">Envanterde yetenek kitabi yok</div>';
+    } else {
+      html += '<div class="smu-grid">';
+      for (const book of books) {
+        const def = SKILL_BOOK_DEFS[book.id];
+        if (!def) continue;
+        const alreadyLearned = profile?.learnedSkillIds.includes(book.id) ?? false;
+        const slotsFull = (profile?.learnedSkillIds.length ?? 0) >= SHADOW_ENHANCEMENT.maxSkillSlots;
+        const canTeach = profile !== null && !alreadyLearned && !slotsFull;
+        html += `<div class="smu-card">
+          <div class="smu-card-name" style="color:#c084fc">${def.name} x${book.count}</div>
+          <div class="smu-card-desc">${def.description}</div>
+          <span class="smu-btn${canTeach ? '' : ' disabled'}" data-teach="${book.id}">
+            ${alreadyLearned ? 'Zaten Biliyor' : slotsFull ? 'Slot Dolu' : profile ? 'Ogret' : 'Golge Sec'}
+          </span>
+        </div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    right.innerHTML = html;
+
+    right.querySelectorAll('[data-teach]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (!this.selectedUid) return;
+        const id = (el as HTMLElement).dataset['teach']!;
+        if (this.inventory.removeItem(id)) {
+          this.profileManager.learnSkill(this.selectedUid, id);
+        }
+        this.refresh();
+      });
+    });
+  }
+}

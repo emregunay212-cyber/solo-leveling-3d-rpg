@@ -9,6 +9,9 @@ import { PhysicsShapeType } from '@babylonjs/core/Physics/v2/IPhysicsEnginePlugi
 import { Ray } from '@babylonjs/core/Culling/ray';
 import { EnemyAI } from './EnemyAI';
 import type { Damageable } from '../combat/CombatSystem';
+import { ENEMY_VISUAL, SHADOW } from '../config/GameConfig';
+import { eventBus } from '../core/EventBus';
+import type { GameContext } from '../core/GameContext';
 
 export interface EnemyDef {
   name: string;
@@ -45,10 +48,16 @@ export class Enemy implements Damageable {
   private hitFlashTimer = 0;
   private deathTimer = 0;
   private isDead = false;
+  private extracted = false;
+
+  // Threat sistemi — golge askeri hasar verince dusmanin dikkatini ceker
+  private threatPos: Vector3 | null = null;
+  private threatTimer = 0;
 
   // Callbacks
   private onDeath: ((enemy: Enemy) => void) | null = null;
-  private onAttack: ((damage: number) => void) | null = null;
+  private onAttack: ((damage: number, isBackstab: boolean) => void) | null = null;
+  private onAttackThreat: ((damage: number, threatPos: Vector3) => void) | null = null;
 
   constructor(scene: Scene, spawnPos: Vector3, def: EnemyDef) {
     this.scene = scene;
@@ -60,11 +69,11 @@ export class Enemy implements Damageable {
 
     // Create mesh
     this.mesh = MeshBuilder.CreateCapsule(`enemy_${this.id}`, {
-      height: 1.8 * def.scale,
-      radius: 0.35 * def.scale,
+      height: ENEMY_VISUAL.bodyHeightMultiplier * def.scale,
+      radius: ENEMY_VISUAL.bodyRadiusMultiplier * def.scale,
     }, scene);
     this.mesh.position = spawnPos.clone();
-    this.mesh.position.y += 0.9 * def.scale;
+    this.mesh.position.y += ENEMY_VISUAL.meshYOffsetMultiplier * def.scale;
 
     this.mat = new StandardMaterial(`enemyMat_${this.id}`, scene);
     this.mat.diffuseColor = def.color.clone();
@@ -77,7 +86,7 @@ export class Enemy implements Damageable {
     }, scene);
 
     // HP bar
-    this.hpBarBg = MeshBuilder.CreatePlane(`ehpBg_${this.id}`, { width: 1.0, height: 0.1 }, scene);
+    this.hpBarBg = MeshBuilder.CreatePlane(`ehpBg_${this.id}`, { width: ENEMY_VISUAL.hpBarWidth, height: ENEMY_VISUAL.hpBarHeight }, scene);
     this.hpBarBg.billboardMode = Mesh.BILLBOARDMODE_ALL;
     this.hpBarBg.isPickable = false;
     const bgMat = new StandardMaterial(`ehpBgMat_${this.id}`, scene);
@@ -105,9 +114,11 @@ export class Enemy implements Damageable {
   }
 
   public setOnDeath(cb: (enemy: Enemy) => void): void { this.onDeath = cb; }
-  public setOnAttackPlayer(cb: (damage: number) => void): void { this.onAttack = cb; }
+  public setOnAttackPlayer(cb: (damage: number, isBackstab: boolean) => void): void { this.onAttack = cb; }
+  public setOnAttackThreat(cb: (damage: number, threatPos: Vector3) => void): void { this.onAttackThreat = cb; }
 
-  public update(dt: number, playerPos: Vector3, playerAlive: boolean): void {
+  public update(ctx: GameContext): void {
+    const dt = ctx.deltaTime;
     if (this.isDead) {
       this.deathTimer -= dt;
       if (this.deathTimer <= 0) {
@@ -118,12 +129,22 @@ export class Enemy implements Damageable {
     }
 
     // AI update
-    this.ai.update(dt, playerPos, playerAlive);
+    this.ai.update(dt, ctx.player.position, ctx.player.isAlive, ctx.player.rotationY);
 
-    // Apply velocity (simple movement, no physics engine for enemies)
+    // Slow timer
+    if (this.slowTimer > 0) this.slowTimer -= dt;
+
+    // Threat timer
+    if (this.threatTimer > 0) {
+      this.threatTimer -= dt;
+      if (this.threatTimer <= 0) this.threatPos = null;
+    }
+
+    // Apply velocity (slow efekti hesaba katilir)
     if (this.velocity.lengthSquared() > 0.01) {
-      this.position.x += this.velocity.x * dt;
-      this.position.z += this.velocity.z * dt;
+      const slow = this.getSlowMultiplier();
+      this.position.x += this.velocity.x * dt * slow;
+      this.position.z += this.velocity.z * dt * slow;
     }
 
     // Ground snap via raycast
@@ -132,12 +153,12 @@ export class Enemy implements Damageable {
 
     // Sync mesh
     this.mesh.position.x = this.position.x;
-    this.mesh.position.y = this.position.y + 0.9 * this.def.scale;
+    this.mesh.position.y = this.position.y + ENEMY_VISUAL.meshYOffsetMultiplier * this.def.scale;
     this.mesh.position.z = this.position.z;
 
     // HP bar position
     this.hpBarBg.position.x = this.mesh.position.x;
-    this.hpBarBg.position.y = this.mesh.position.y + 1.2 * this.def.scale;
+    this.hpBarBg.position.y = this.mesh.position.y + ENEMY_VISUAL.hpBarYOffsetMultiplier * this.def.scale;
     this.hpBarBg.position.z = this.mesh.position.z;
 
     // Hit flash
@@ -154,8 +175,12 @@ export class Enemy implements Damageable {
     if (this.isDead) return;
     this.hp = Math.max(0, this.hp - amount);
 
+    // Threat: saldirganin pozisyonunu kaydet (golge askerler icin)
+    this.threatPos = attackerPos.clone();
+    this.threatTimer = SHADOW.threatDuration;
+
     // Flash white
-    this.hitFlashTimer = 0.1;
+    this.hitFlashTimer = ENEMY_VISUAL.hitFlashDuration;
     this.mat.diffuseColor = new Color3(1, 1, 1);
     this.mat.emissiveColor = new Color3(0.5, 0.5, 0.5);
 
@@ -164,15 +189,15 @@ export class Enemy implements Damageable {
       const knockDir = this.position.subtract(attackerPos);
       knockDir.y = 0;
       knockDir.normalize();
-      this.position.addInPlace(knockDir.scale(0.4));
+      this.position.addInPlace(knockDir.scale(ENEMY_VISUAL.knockbackDistance));
     }
 
     // Update HP bar
     const ratio = Math.max(0.01, this.hp / this.maxHp);
     this.hpBarFill.scaling.x = ratio;
-    if (ratio > 0.5) {
+    if (ratio > ENEMY_VISUAL.hpColorThresholds.yellow) {
       this.fillMat.diffuseColor = new Color3(0.8, 0.1, 0.1);
-    } else if (ratio > 0.25) {
+    } else if (ratio > ENEMY_VISUAL.hpColorThresholds.red) {
       this.fillMat.diffuseColor = new Color3(0.8, 0.6, 0.1);
     } else {
       this.fillMat.diffuseColor = new Color3(0.8, 0.1, 0.1);
@@ -188,15 +213,30 @@ export class Enemy implements Damageable {
   private die(): void {
     this.isDead = true;
     this.ai.onDeath();
-    this.mat.alpha = 0.4;
-    this.mesh.scaling.scaleInPlace(0.6);
+    this.mat.alpha = ENEMY_VISUAL.deathOpacity;
+    this.mesh.scaling.scaleInPlace(ENEMY_VISUAL.deathScale);
     this.hpBarBg.isVisible = false;
-    this.deathTimer = 3; // visible for 3 seconds before disappearing
+    this.deathTimer = ENEMY_VISUAL.deathTimer;
     if (this.onDeath) this.onDeath(this);
+    eventBus.emit('enemy:death', {
+      enemy: this,
+      xpReward: this.def.xpReward,
+      goldReward: this.def.goldReward,
+    });
   }
 
-  public onAttackPlayer(damage: number): void {
-    if (this.onAttack) this.onAttack(damage);
+  public onAttackPlayer(damage: number, isBackstab: boolean = false): void {
+    if (this.onAttack) this.onAttack(damage, isBackstab);
+  }
+
+  public onAttackThreatTarget(damage: number): void {
+    if (this.threatPos && this.onAttackThreat) {
+      this.onAttackThreat(damage, this.threatPos);
+    }
+  }
+
+  public getRotationY(): number {
+    return this.mesh.rotation.y;
   }
 
   public faceDirection(dir: Vector3): void {
@@ -209,16 +249,51 @@ export class Enemy implements Damageable {
     this.hpBarFill.scaling.x = Math.max(0.01, ratio);
   }
 
+  // ─── Slow efekti (skill F icin) ───
+  private slowMultiplier = 1;
+  private slowTimer = 0;
+
+  public applySlow(multiplier: number, duration: number): void {
+    this.slowMultiplier = multiplier;
+    this.slowTimer = duration;
+  }
+
+  public getSlowMultiplier(): number {
+    return this.slowTimer > 0 ? this.slowMultiplier : 1;
+  }
+
+  /** Aktif tehdit pozisyonu (golge askeri hasar verdiyse) */
+  public getThreatPos(): Vector3 | null {
+    return this.threatPos;
+  }
+
+  public hasThreat(): boolean {
+    return this.threatPos !== null && this.threatTimer > 0;
+  }
+
   public isAlive(): boolean { return !this.isDead; }
+
+  /** Ceset cikarilabilir mi? (olu + gorunur + henuz cikarilmamis) */
+  public isExtractable(): boolean {
+    return this.isDead && this.deathTimer > 0 && !this.extracted;
+  }
+
+  /** Cikarildiktan sonra tekrar cikarilmasini engelle */
+  public markExtracted(): void {
+    this.extracted = true;
+    this.mesh.isVisible = false;
+    this.hpBarBg.isVisible = false;
+  }
 
   public canRespawn(): boolean { return this.isDead && this.deathTimer <= 0; }
 
   public respawn(pos: Vector3): void {
     this.isDead = false;
+    this.extracted = false;
     this.hp = this.maxHp;
     this.position = pos.clone();
     this.mesh.position = pos.clone();
-    this.mesh.position.y += 0.9 * this.def.scale;
+    this.mesh.position.y += ENEMY_VISUAL.meshYOffsetMultiplier * this.def.scale;
     this.mesh.isVisible = true;
     this.mesh.scaling.setAll(1);
     this.mat.alpha = 1;

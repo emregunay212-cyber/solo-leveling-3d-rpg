@@ -3,8 +3,6 @@ export class InputManager {
   private mouseButtons = new Map<number, boolean>();
   private mouseDeltaX = 0;
   private mouseDeltaY = 0;
-  private mouseX = 0;
-  private mouseY = 0;
   private canvas: HTMLCanvasElement;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -17,6 +15,10 @@ export class InputManager {
   private setupKeyboard(): void {
     window.addEventListener('keydown', (e) => {
       this.keys.set(e.code, true);
+      // Ctrl basili iken tarayici kisayollarini engelle (Ctrl+S kaydet vb.)
+      if (e.ctrlKey && !e.altKey && (e.code !== 'KeyC' && e.code !== 'KeyV')) {
+        e.preventDefault();
+      }
     });
     window.addEventListener('keyup', (e) => {
       this.keys.set(e.code, false);
@@ -51,8 +53,6 @@ export class InputManager {
     this.canvas.addEventListener('pointermove', (e) => {
       this.mouseDeltaX += e.movementX;
       this.mouseDeltaY += e.movementY;
-      this.mouseX = e.clientX;
-      this.mouseY = e.clientY;
     });
   }
 
@@ -85,10 +85,6 @@ export class InputManager {
     return delta;
   }
 
-  public getMousePosition(): { x: number; y: number } {
-    return { x: this.mouseX, y: this.mouseY };
-  }
-
   public getMovementVector(): { x: number; z: number } {
     let x = 0;
     let z = 0;
@@ -113,5 +109,14 @@ export class InputManager {
 
   public isAttacking(): boolean {
     return this.isKeyDown('Space');
+  }
+
+  public isBlocking(): boolean {
+    return this.isKeyDown('KeyC');
+  }
+
+  public dispose(): void {
+    this.keys.clear();
+    this.mouseButtons.clear();
   }
 }

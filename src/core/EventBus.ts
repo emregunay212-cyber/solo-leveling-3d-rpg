@@ -1,28 +1,63 @@
-type EventCallback = (...args: any[]) => void;
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import type { Enemy } from '../enemies/Enemy';
+import type { EquipmentSlot, ShadowRank } from '../shadows/ShadowEnhancementTypes';
 
+/**
+ * Oyun olay tanimlari.
+ * Tum event tipleri burada tanimlanir — string key hatalarini onler.
+ */
+export interface GameEvents {
+  'enemy:death': { enemy: Enemy; xpReward: number; goldReward: number };
+  'enemy:spawn': { enemy: Enemy; position: Vector3 };
+  'player:damage': { amount: number; type: 'normal' | 'block' | 'parry' | 'backstab' };
+  'player:death': { position: Vector3 };
+  'player:respawn': { position: Vector3 };
+  'player:levelUp': { level: number };
+  'player:xpGain': { amount: number };
+  'combat:hit': { damage: number; isCritical: boolean; targetPos: Vector3 };
+  'combat:combo': { index: number; isFinisher: boolean };
+  'skill:cast': { skillId: string; mpCost: number };
+  'skill:hit': { skillId: string; damage: number; targetCount: number };
+  'shadow:extracted': { shadowType: string; name: string };
+  'shadow:defeated': { shadowType: string };
+  'shadow:failed': { reason: string };
+  'stat:changed': Record<string, never>;
+  'shadow:equip': { shadowUid: number; slot: EquipmentSlot; itemId: string };
+  'shadow:unequip': { shadowUid: number; slot: EquipmentSlot; itemId: string };
+  'shadow:learnSkill': { shadowUid: number; skillId: string };
+  'shadow:rankUp': { shadowUid: number; newRank: ShadowRank; rankName: string };
+  'loot:drop': { itemId: string; itemType: 'equipment' | 'skillbook'; enemyName: string };
+}
+
+type EventCallback<T> = (data: T) => void;
+
+/**
+ * Tipli pub/sub olay sistemi.
+ * Generic tipler sayesinde event payload'lari derleme zamaninda kontrol edilir.
+ */
 export class EventBus {
-  private listeners = new Map<string, Set<EventCallback>>();
+  private listeners = new Map<string, Set<EventCallback<unknown>>>();
 
-  on(event: string, callback: EventCallback): void {
+  on<K extends keyof GameEvents>(event: K, callback: EventCallback<GameEvents[K]>): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(callback);
+    this.listeners.get(event)!.add(callback as EventCallback<unknown>);
   }
 
-  off(event: string, callback: EventCallback): void {
-    this.listeners.get(event)?.delete(callback);
+  off<K extends keyof GameEvents>(event: K, callback: EventCallback<GameEvents[K]>): void {
+    this.listeners.get(event)?.delete(callback as EventCallback<unknown>);
   }
 
-  emit(event: string, ...args: any[]): void {
-    this.listeners.get(event)?.forEach(cb => cb(...args));
+  emit<K extends keyof GameEvents>(event: K, data: GameEvents[K]): void {
+    this.listeners.get(event)?.forEach(cb => cb(data));
   }
 
-  once(event: string, callback: EventCallback): void {
-    const wrapper = (...args: any[]) => {
-      callback(...args);
+  once<K extends keyof GameEvents>(event: K, callback: EventCallback<GameEvents[K]>): void {
+    const wrapper = ((data: GameEvents[K]) => {
+      callback(data);
       this.off(event, wrapper);
-    };
+    }) as EventCallback<GameEvents[K]>;
     this.on(event, wrapper);
   }
 

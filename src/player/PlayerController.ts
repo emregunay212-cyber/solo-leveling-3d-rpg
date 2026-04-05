@@ -8,14 +8,14 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { Ray } from '@babylonjs/core/Culling/ray';
 import {
   PhysicsCharacterController,
-  CharacterSupportedState,
 } from '@babylonjs/core/Physics/v2/characterController';
 import { InputManager } from '../core/InputManager';
 import { PlayerCamera } from './PlayerCamera';
+import { PLAYER } from '../config/GameConfig';
 
 /**
  * Metin2-style character controller:
- * - WASD movement, Shift sprint, C dodge
+ * - WASD movement, Shift sprint, C block/parry
  * - No jumping (Space is for attack)
  * - Havok for horizontal collision
  * - Raycast for ground snapping
@@ -29,15 +29,13 @@ export class PlayerController {
   private camera!: PlayerCamera;
   private scene: Scene;
 
-  // Tuning
-  private readonly WALK_SPEED = 5;
-  private readonly SPRINT_SPEED = 9;
-  private readonly PLAYER_HEIGHT = 1.8;
-  private readonly PLAYER_RADIUS = 0.35;
-  private readonly ROTATION_LERP = 0.15;
-  private readonly DODGE_SPEED = 15;
-  private readonly DODGE_DURATION = 0.3;
-  private readonly DODGE_COOLDOWN = 1.0;
+  // Tuning (from GameConfig)
+  private readonly WALK_SPEED = PLAYER.walkSpeed;
+  private readonly SPRINT_SPEED = PLAYER.sprintSpeed;
+  private readonly PLAYER_HEIGHT = PLAYER.height;
+  private readonly PLAYER_RADIUS = PLAYER.radius;
+  private readonly ROTATION_LERP = PLAYER.rotationLerp;
+  private readonly BLOCK_SPEED_MULTIPLIER = PLAYER.blockSpeedMultiplier;
 
   // Reusable
   private readonly zeroGravity = new Vector3(0, 0, 0);
@@ -47,11 +45,9 @@ export class PlayerController {
   private currentSpeed = 0;
   private targetRotationY = 0;
 
-  // Dodge
-  private isDodging = false;
-  private dodgeTimer = 0;
-  private dodgeCooldownTimer = 0;
-  private dodgeDirection = Vector3.Zero();
+  // Block
+  private isBlockingState = false;
+  private mat!: StandardMaterial;
 
   constructor(scene: Scene, input: InputManager, camera: PlayerCamera | null) {
     this.scene = scene;
@@ -82,32 +78,59 @@ export class PlayerController {
     mat.diffuseColor = new Color3(0.2, 0.15, 0.4);
     mat.specularColor = new Color3(0.3, 0.2, 0.5);
     body.material = mat;
+    this.mat = mat;
     return body;
   }
 
   public update(dt: number): void {
     if (dt <= 0) dt = 1 / 60;
-    this.updateDodge(dt);
 
-    // ─── Horizontal input ───
+    // Dash override — skill Q sirasinda normal hareket devre disi
+    if (this.isDashing) {
+      this.dashTimer -= dt;
+      if (this.dashTimer <= 0) {
+        this.isDashing = false;
+      }
+      this.applyPhysics(dt, this.dashDirection, this.dashSpeed);
+      this.root.position.copyFrom(this.mesh.position);
+      this.camera.update();
+      return;
+    }
+
+    this.updateBlockState();
+    const { moveDir, speed } = this.calculateMovement();
+    this.currentSpeed = speed;
+    this.applyPhysics(dt, moveDir, speed);
+    this.updateRotation();
+    this.root.position.copyFrom(this.mesh.position);
+    this.camera.update();
+  }
+
+  private updateBlockState(): void {
+    const wasBlocking = this.isBlockingState;
+    this.isBlockingState = this.input.isBlocking();
+
+    if (this.isBlockingState && !wasBlocking) {
+      this.mat.emissiveColor = new Color3(0.1, 0.2, 0.5);
+    } else if (!this.isBlockingState && wasBlocking) {
+      this.mat.emissiveColor = Color3.Black();
+    }
+  }
+
+  private calculateMovement(): { moveDir: Vector3; speed: number } {
     const moveInput = this.input.getMovementVector();
     const hasManualInput = moveInput.x !== 0 || moveInput.z !== 0;
     let moveDir = Vector3.Zero();
     let speed = 0;
 
-    // Manual input cancels auto-move
     if (hasManualInput) {
       this.autoMoveTarget = null;
-    }
-
-    if (hasManualInput && !this.isDodging) {
       const forward = this.camera.getForwardDirection();
       const right = this.camera.getRightDirection();
       moveDir = forward.scale(moveInput.z).add(right.scale(moveInput.x)).normalize();
       this.targetRotationY = Math.atan2(moveDir.x, moveDir.z);
       speed = this.input.isSprinting() ? this.SPRINT_SPEED : this.WALK_SPEED;
-    } else if (this.autoMoveTarget && !this.isDodging) {
-      // Auto-move toward target
+    } else if (this.autoMoveTarget) {
       const toTarget = this.autoMoveTarget.subtract(this.mesh.position);
       toTarget.y = 0;
       const dist = toTarget.length();
@@ -116,53 +139,35 @@ export class PlayerController {
         this.targetRotationY = Math.atan2(moveDir.x, moveDir.z);
         speed = this.autoMoveSpeed;
       } else {
-        // Reached target
         this.autoMoveTarget = null;
       }
     }
 
-    this.currentSpeed = speed;
-
-    // ─── Build horizontal velocity ───
-    const velocity = new Vector3(0, 0, 0);
-    if (this.isDodging) {
-      velocity.x = this.dodgeDirection.x * this.DODGE_SPEED;
-      velocity.z = this.dodgeDirection.z * this.DODGE_SPEED;
-    } else {
-      velocity.x = moveDir.x * speed;
-      velocity.z = moveDir.z * speed;
+    if (this.isBlockingState) {
+      speed *= this.BLOCK_SPEED_MULTIPLIER;
     }
 
-    // ─── Havok: horizontal collision ───
+    return { moveDir, speed };
+  }
+
+  private applyPhysics(dt: number, moveDir: Vector3, speed: number): void {
+    const velocity = new Vector3(moveDir.x * speed, 0, moveDir.z * speed);
+
     const support = this.characterController.checkSupport(dt, this.downVec);
     this.characterController.setVelocity(velocity);
     this.characterController.integrate(dt, support, this.zeroGravity);
 
-    // ─── Get position, snap to ground ───
     const newPos = this.characterController.getPosition();
     const floorY = this.getFloorY(newPos);
     if (floorY !== null) {
       newPos.y = floorY + this.PLAYER_HEIGHT / 2;
     }
-
-    // Safety floor
     if (newPos.y < this.PLAYER_HEIGHT / 2) {
       newPos.y = this.PLAYER_HEIGHT / 2;
     }
 
-    // Apply position
     this.characterController.setPosition(newPos);
     this.mesh.position.copyFrom(newPos);
-
-    // ─── Rotation ───
-    this.updateRotation();
-    this.root.position.copyFrom(this.mesh.position);
-    this.camera.update();
-
-    // ─── Dodge trigger ───
-    if (hasManualInput && this.input.isKeyDown('KeyC') && this.dodgeCooldownTimer <= 0) {
-      this.startDodge(moveDir);
-    }
   }
 
   // ─── Ground raycast ───
@@ -183,24 +188,9 @@ export class PlayerController {
     return null;
   }
 
-  // ─── Dodge ───
-  private startDodge(direction: Vector3): void {
-    this.isDodging = true;
-    this.dodgeTimer = this.DODGE_DURATION;
-    this.dodgeCooldownTimer = this.DODGE_COOLDOWN;
-    this.dodgeDirection = direction.clone();
-  }
-
-  private updateDodge(dt: number): void {
-    if (this.dodgeCooldownTimer > 0) this.dodgeCooldownTimer -= dt;
-    if (!this.isDodging) return;
-    this.dodgeTimer -= dt;
-    if (this.dodgeTimer <= 0) this.isDodging = false;
-  }
-
   // ─── Rotation ───
   private updateRotation(): void {
-    if (this.currentSpeed > 0 || this.isDodging) {
+    if (this.currentSpeed > 0) {
       let diff = this.targetRotationY - this.mesh.rotation.y;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
@@ -221,8 +211,37 @@ export class PlayerController {
 
   public getPosition(): Vector3 { return this.mesh.position; }
   public isMoving(): boolean { return this.currentSpeed > 0 || this.autoMoveTarget !== null; }
-  public getIsDodging(): boolean { return this.isDodging; }
+  public getIsBlocking(): boolean { return this.isBlockingState; }
   public getIsGrounded(): boolean { return true; }
   public getCurrentSpeed(): number { return this.currentSpeed; }
   public setCamera(camera: PlayerCamera): void { this.camera = camera; }
+
+  // ─── Skill: Dash ───
+  private isDashing = false;
+  private dashTimer = 0;
+  private dashDirection = Vector3.Zero();
+  private dashSpeed = 0;
+
+  /** Skill Q icin: baktigi yone hizla atil */
+  public dashTo(distance: number, duration: number): void {
+    const rotY = this.mesh.rotation.y;
+    this.dashDirection = new Vector3(Math.sin(rotY), 0, Math.cos(rotY));
+    this.dashSpeed = distance / Math.max(0.01, duration);
+    this.dashTimer = duration;
+    this.isDashing = true;
+    this.autoMoveTarget = null;
+  }
+
+  public getIsDashing(): boolean { return this.isDashing; }
+
+  public getForwardDirection(): Vector3 {
+    const rotY = this.mesh.rotation.y;
+    return new Vector3(Math.sin(rotY), 0, Math.cos(rotY));
+  }
+
+  public dispose(): void {
+    this.mesh.dispose();
+    this.characterController.dispose();
+    this.root.dispose();
+  }
 }

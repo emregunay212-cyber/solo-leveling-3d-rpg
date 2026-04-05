@@ -4,6 +4,7 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { Scene } from '@babylonjs/core/scene';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
+import { UI } from '../config/GameConfig';
 
 interface RippleEffect {
   ring: Mesh;
@@ -25,28 +26,28 @@ export class ClickIndicator {
     this.scene = scene;
 
     this.material = new StandardMaterial('clickRippleMat', scene);
-    this.material.diffuseColor = new Color3(0.5, 0.3, 1.0);
-    this.material.emissiveColor = new Color3(0.3, 0.15, 0.7);
-    this.material.alpha = 0.8;
+    this.material.diffuseColor = new Color3(UI.clickIndicator.color.r, UI.clickIndicator.color.g, UI.clickIndicator.color.b);
+    this.material.emissiveColor = new Color3(UI.clickIndicator.emissive.r, UI.clickIndicator.emissive.g, UI.clickIndicator.emissive.b);
+    this.material.alpha = UI.clickIndicator.alpha;
     this.material.disableLighting = true;
     this.material.backFaceCulling = false;
   }
 
   public spawn(position: Vector3): void {
     const ring = this.getRing();
-    ring.position.set(position.x, position.y + 0.05, position.z);
-    ring.scaling.setAll(0.1);
+    ring.position.set(position.x, position.y + UI.clickIndicator.yOffset, position.z);
+    ring.scaling.setAll(UI.clickIndicator.initialScale);
     ring.isVisible = true;
 
     // Clone material so each ripple fades independently
     const mat = this.material.clone(`rippleMat_${Date.now()}`);
-    mat.alpha = 0.8;
+    mat.alpha = UI.clickIndicator.alpha;
     ring.material = mat;
 
     this.active.push({
       ring,
       age: 0,
-      maxAge: 0.6,
+      maxAge: UI.clickIndicator.maxAge,
     });
   }
 
@@ -67,13 +68,13 @@ export class ClickIndicator {
       }
 
       // Expand ring
-      const scale = 0.1 + t * 2.0;
+      const scale = UI.clickIndicator.initialScale + t * UI.clickIndicator.maxScaleExpansion;
       ripple.ring.scaling.setAll(scale);
 
       // Fade out
       const mat = ripple.ring.material as StandardMaterial;
       if (mat) {
-        mat.alpha = 0.8 * (1 - t);
+        mat.alpha = UI.clickIndicator.alpha * (1 - t);
       }
     }
   }

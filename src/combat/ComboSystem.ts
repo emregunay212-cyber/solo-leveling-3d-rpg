@@ -1,3 +1,5 @@
+import { COMBO } from '../config/GameConfig';
+
 /**
  * Manages attack combo chains.
  * Click -> Hit1 -> (click within window) -> Hit2 -> (click within window) -> Hit3
@@ -13,12 +15,8 @@ export class ComboSystem {
   // Attack speed multiplier: 1.0 = normal, higher = faster attacks
   private attackSpeedMult = 1.0;
 
-  // Combo definitions: [damage multiplier, attack duration, combo window]
-  private readonly COMBO_STEPS = [
-    { damageMultiplier: 1.0, duration: 0.35, window: 0.5 },  // Hit 1 - quick slash
-    { damageMultiplier: 1.2, duration: 0.35, window: 0.5 },  // Hit 2 - follow-up
-    { damageMultiplier: 1.8, duration: 0.5, window: 0.0 },   // Hit 3 - heavy finisher
-  ];
+  // Combo definitions from central config
+  private readonly COMBO_STEPS = COMBO.hits;
 
   public update(dt: number): void {
     // Attack animation timer
@@ -61,7 +59,7 @@ export class ComboSystem {
     // Start attack - duration divided by speed multiplier
     this.isAttacking = true;
     this.attackTimer = step.duration / speedDiv;
-    this.attackCooldown = (step.duration + 0.05) / speedDiv;
+    this.attackCooldown = (step.duration + COMBO.cooldownBuffer) / speedDiv;
 
     // Advance combo or reset
     if (this.comboIndex < this.COMBO_STEPS.length - 1) {
@@ -70,7 +68,7 @@ export class ComboSystem {
     } else {
       this.comboIndex = 0;
       this.comboTimer = 0;
-      this.attackCooldown = (step.duration + 0.3) / speedDiv;
+      this.attackCooldown = (step.duration + COMBO.finisherCooldownBuffer) / speedDiv;
     }
 
     return result;
@@ -81,7 +79,7 @@ export class ComboSystem {
     this.comboTimer = 0;
   }
 
-  public setAttackSpeed(mult: number): void { this.attackSpeedMult = Math.max(0.5, mult); }
+  public setAttackSpeed(mult: number): void { this.attackSpeedMult = Math.max(COMBO.minAttackSpeedMultiplier, mult); }
   public getAttackSpeed(): number { return this.attackSpeedMult; }
   public getIsAttacking(): boolean { return this.isAttacking; }
   public getComboIndex(): number { return this.comboIndex; }

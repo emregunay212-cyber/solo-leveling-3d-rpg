@@ -5,6 +5,7 @@ import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { DAMAGE_NUMBERS } from '../config/GameConfig';
 
 interface FloatingNumber {
   mesh: Mesh;
@@ -21,10 +22,10 @@ export class DamageNumbers {
   private scene: Scene;
   private active: FloatingNumber[] = [];
   private pool: Mesh[] = [];
-  private readonly MAX_POOL = 30;
-  private readonly FLOAT_SPEED = 2.5;
-  private readonly LIFETIME = 0.8;
-  private readonly SPREAD = 0.5;
+  private readonly MAX_POOL = DAMAGE_NUMBERS.maxPoolSize;
+  private readonly FLOAT_SPEED = DAMAGE_NUMBERS.floatSpeed;
+  private readonly LIFETIME = DAMAGE_NUMBERS.lifetime;
+  private readonly SPREAD = DAMAGE_NUMBERS.spreadRange;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -33,14 +34,30 @@ export class DamageNumbers {
   public spawn(
     position: Vector3,
     damage: number,
-    type: 'normal' | 'critical' | 'player_hurt'
+    type: 'normal' | 'critical' | 'player_hurt' | 'parry' | 'block' | 'backstab' | 'skill' | 'arise' | 'extract_fail'
   ): void {
     const mesh = this.getMesh();
 
-    // Set text and color
-    const color = type === 'critical' ? '#FFD700' : type === 'player_hurt' ? '#FF4444' : '#FFFFFF';
-    const fontSize = type === 'critical' ? 72 : type === 'player_hurt' ? 60 : 54;
-    const text = type === 'critical' ? `${damage}!` : `${damage}`;
+    // Set text and color based on type
+    const typeConfig = DAMAGE_NUMBERS.types[type];
+    const color = typeConfig.color;
+    const fontSize = typeConfig.fontSize;
+    let text: string;
+
+    switch (type) {
+      case 'critical':
+        text = `${damage}!`; break;
+      case 'parry':
+        text = 'PARRY!'; break;
+      case 'backstab':
+        text = `${damage}!`; break;
+      case 'arise':
+        text = 'ARISE!'; break;
+      case 'extract_fail':
+        text = 'BASARISIZ'; break;
+      default:
+        text = `${damage}`; break;
+    }
 
     this.updateTexture(mesh, text, color, fontSize);
 
@@ -52,8 +69,7 @@ export class DamageNumbers {
     mesh.isVisible = true;
 
     // Scale based on type
-    const scale = type === 'critical' ? 1.2 : type === 'player_hurt' ? 0.9 : 0.8;
-    mesh.scaling.setAll(scale);
+    mesh.scaling.setAll(typeConfig.scale);
 
     this.active.push({
       mesh,
@@ -83,10 +99,10 @@ export class DamageNumbers {
       // Float up and slow down
       const t = 1 - (num.lifetime / num.maxLifetime);
       num.mesh.position.addInPlace(num.velocity.scale(dt));
-      num.velocity.y *= 0.95; // decelerate
+      num.velocity.y *= DAMAGE_NUMBERS.velocityDeceleration; // decelerate
 
       // Fade out in last 30%
-      const fadeStart = 0.7;
+      const fadeStart = DAMAGE_NUMBERS.fadeStartPercent;
       if (t > fadeStart) {
         const alpha = 1 - (t - fadeStart) / (1 - fadeStart);
         const mat = num.mesh.material as StandardMaterial;
@@ -136,8 +152,8 @@ export class DamageNumbers {
 
     // Text shadow
     ctx.font = `bold ${fontSize}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    (ctx as unknown as CanvasRenderingContext2D).textAlign = 'center';
+    (ctx as unknown as CanvasRenderingContext2D).textBaseline = 'middle';
     ctx.fillStyle = '#000000';
     ctx.fillText(text, 130, 66);
 

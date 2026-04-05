@@ -5,6 +5,7 @@ import { CombatSystem, Damageable } from '../combat/CombatSystem';
 import { ComboSystem } from '../combat/ComboSystem';
 import { DamageNumbers } from '../combat/DamageNumbers';
 import { PlayerController } from './PlayerController';
+import { COMBAT } from '../config/GameConfig';
 
 export class PlayerCombat {
   private input: InputManager;
@@ -14,17 +15,17 @@ export class PlayerCombat {
   private player: PlayerController;
   private scene: Scene;
 
-  private baseDamage = 25;
+  private baseDamage = COMBAT.basePlayerDamage;
   private mouseWasDown = false;
   private lastHitCount = 0;
 
   // Auto-attack (Metin2 style: double-click enemy -> walk to + auto attack)
   private autoAttackTarget: Damageable | null = null;
-  private readonly AUTO_ATTACK_RANGE = 3.5;
+  private readonly AUTO_ATTACK_RANGE = COMBAT.autoAttackRange;
 
   // Double-click detection
   private lastClickTime = 0;
-  private readonly DOUBLE_CLICK_TIME = 0.4; // seconds
+  private readonly DOUBLE_CLICK_TIME = COMBAT.doubleClickTime; // seconds
 
   constructor(
     scene: Scene,
@@ -161,5 +162,5 @@ export class PlayerCombat {
   public getComboSystem(): ComboSystem { return this.comboSystem; }
   public getLastHitCount(): number { return this.lastHitCount; }
   public getBaseDamage(): number { return this.baseDamage; }
-  public setBaseDamage(dmg: number): void { this.baseDamage = dmg; }
+  public setBaseDamage(dmg: number): void { (this as unknown as { baseDamage: number }).baseDamage = dmg; }
 }

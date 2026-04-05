@@ -2,6 +2,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Scene } from '@babylonjs/core/scene';
 import { Ray } from '@babylonjs/core/Culling/ray';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
+import { COMBAT } from '../config/GameConfig';
 
 export interface Damageable {
   mesh: Mesh;
@@ -13,10 +14,14 @@ export class CombatSystem {
   private scene: Scene;
   private targets: Damageable[] = [];
 
-  // Attack settings - Metin2 style (generous range and angle)
-  private readonly ATTACK_RANGE = 4.0;
-  private readonly ATTACK_ANGLE = Math.PI * 0.75; // 135 degree cone - very wide
-  private readonly CRIT_CHANCE = 0.15;
+  // Attack settings (from GameConfig)
+  private readonly ATTACK_RANGE = COMBAT.attackRange;
+  private readonly ATTACK_ANGLE = COMBAT.attackAngle;
+  private readonly CRIT_CHANCE = COMBAT.critChance;
+
+  // Direction check angles (from GameConfig)
+  private static readonly FACING_HALF_ANGLE = COMBAT.facingHalfAngle;
+  private static readonly BEHIND_DOT_THRESHOLD = COMBAT.behindDotThreshold;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -33,6 +38,41 @@ export class CombatSystem {
   public unregisterTarget(target: Damageable): void {
     const idx = this.targets.indexOf(target);
     if (idx >= 0) this.targets.splice(idx, 1);
+  }
+
+  /**
+   * Check if an entity at entityPos with rotation entityRotY is facing targetPos
+   * within halfAngle (default 60° each side = 120° total forward arc)
+   */
+  public static isFacing(
+    entityPos: Vector3,
+    entityRotY: number,
+    targetPos: Vector3,
+    halfAngle: number = CombatSystem.FACING_HALF_ANGLE
+  ): boolean {
+    const forward = new Vector3(Math.sin(entityRotY), 0, Math.cos(entityRotY));
+    const toTarget = targetPos.subtract(entityPos);
+    toTarget.y = 0;
+    if (toTarget.lengthSquared() < 0.001) return true; // same position
+    const dot = Vector3.Dot(forward, toTarget.normalize());
+    return dot > Math.cos(halfAngle);
+  }
+
+  /**
+   * Check if attacker is behind the target (outside target's rear arc)
+   * Returns true if attacker is in the target's blind spot
+   */
+  public static isTargetBehind(
+    attackerPos: Vector3,
+    targetPos: Vector3,
+    targetRotY: number
+  ): boolean {
+    const forward = new Vector3(Math.sin(targetRotY), 0, Math.cos(targetRotY));
+    const toAttacker = attackerPos.subtract(targetPos);
+    toAttacker.y = 0;
+    if (toAttacker.lengthSquared() < 0.001) return false;
+    const dot = Vector3.Dot(forward, toAttacker.normalize());
+    return dot < CombatSystem.BEHIND_DOT_THRESHOLD;
   }
 
   /**
@@ -57,7 +97,7 @@ export class CombatSystem {
       // Range check
       if (dist > this.ATTACK_RANGE) continue;
 
-      // Angle check (cone attack)
+      // Angle check (90° cone - must be facing target)
       const dirNorm = attackDir.normalize();
       const toTargetNorm = toTarget.normalize();
       const dot = Vector3.Dot(dirNorm, toTargetNorm);
@@ -65,8 +105,8 @@ export class CombatSystem {
 
       // Calculate damage
       const isCritical = Math.random() < this.CRIT_CHANCE;
-      const critMultiplier = isCritical ? 2.0 : 1.0;
-      const variance = 0.85 + Math.random() * 0.3; // 85%-115% variance
+      const critMultiplier = isCritical ? COMBAT.critMultiplier : 1.0;
+      const variance = COMBAT.damageVarianceMin + Math.random() * COMBAT.damageVarianceRange;
       const damage = Math.round(baseDamage * critMultiplier * variance);
 
       // Apply damage

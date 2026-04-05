@@ -1,4 +1,6 @@
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { CombatSystem } from '../combat/CombatSystem';
+import { ENEMY_AI } from '../config/GameConfig';
 import type { Enemy } from './Enemy';
 
 export enum AIState {
@@ -18,28 +20,29 @@ export class EnemyAI {
   public state = AIState.IDLE;
 
   // Detection
-  private readonly DETECTION_RANGE = 10;
-  private readonly ATTACK_RANGE = 2.5;
-  private readonly LEASH_RANGE = 20; // max distance from spawn before returning
-  private readonly CHASE_SPEED = 3.5;
-  private readonly PATROL_SPEED = 1.5;
+  private readonly DETECTION_RANGE = ENEMY_AI.detectionRange;
+  private readonly ATTACK_RANGE = ENEMY_AI.attackRange;
+  private readonly LEASH_RANGE = ENEMY_AI.leashRange; // max distance from spawn before returning
+  private readonly CHASE_SPEED = ENEMY_AI.chaseSpeed;
+  private readonly PATROL_SPEED = ENEMY_AI.patrolSpeed;
 
   // Attack
-  private readonly ATTACK_COOLDOWN = 1.8; // slower attacks
+  private readonly ATTACK_COOLDOWN = ENEMY_AI.attackCooldown; // slower attacks
   private attackTimer = 0;
 
   // Patrol
   private patrolTarget: Vector3 | null = null;
   private patrolWaitTimer = 0;
-  private readonly PATROL_RADIUS = 5;
-  private readonly PATROL_WAIT_MIN = 2;
-  private readonly PATROL_WAIT_MAX = 5;
+  private readonly PATROL_RADIUS = ENEMY_AI.patrolRadius;
+  private readonly PATROL_WAIT_MIN = ENEMY_AI.patrolWaitMin;
+  private readonly PATROL_WAIT_MAX = ENEMY_AI.patrolWaitMax;
 
   // Idle timer
   private idleTimer = 0;
 
   private spawnPos: Vector3;
   private enemy: Enemy;
+  private playerRotY = 0;
 
   constructor(enemy: Enemy, spawnPos: Vector3) {
     this.enemy = enemy;
@@ -47,31 +50,45 @@ export class EnemyAI {
     this.idleTimer = Math.random() * 3; // stagger initial patrol
   }
 
-  public update(dt: number, playerPos: Vector3, playerAlive: boolean): void {
+  private lastPlayerPos = Vector3.Zero();
+
+  public update(dt: number, playerPos: Vector3, playerAlive: boolean, playerRotY: number = 0): void {
+    this.playerRotY = playerRotY;
+    this.lastPlayerPos.copyFrom(playerPos);
     if (this.state === AIState.DEAD) return;
 
     this.attackTimer = Math.max(0, this.attackTimer - dt);
 
-    const toPlayer = playerPos.subtract(this.enemy.position);
-    toPlayer.y = 0;
-    const distToPlayer = toPlayer.length();
+    // Tehdit varsa (golge askeri hasar verdiyse) → threat pozisyonuna yonel
+    // Yoksa oyuncuya yonel
+    const threatPos = this.enemy.getThreatPos();
+    const effectiveTarget = (threatPos && this.enemy.hasThreat()) ? threatPos : playerPos;
+
+    const toTarget = effectiveTarget.subtract(this.enemy.position);
+    toTarget.y = 0;
+    const distToTarget = toTarget.length();
 
     const toSpawn = this.spawnPos.subtract(this.enemy.position);
     toSpawn.y = 0;
     const distToSpawn = toSpawn.length();
 
+    // Oyuncuya mesafe (leash ve algilama icin)
+    const toPlayer = playerPos.subtract(this.enemy.position);
+    toPlayer.y = 0;
+    const distToPlayer = toPlayer.length();
+
     switch (this.state) {
       case AIState.IDLE:
-        this.updateIdle(dt, distToPlayer, playerAlive);
+        this.updateIdle(dt, distToTarget, distToPlayer, playerAlive);
         break;
       case AIState.PATROL:
-        this.updatePatrol(dt, distToPlayer, playerAlive);
+        this.updatePatrol(dt, distToTarget, distToPlayer, playerAlive);
         break;
       case AIState.CHASE:
-        this.updateChase(dt, toPlayer, distToPlayer, distToSpawn, playerAlive);
+        this.updateChase(dt, toTarget, distToTarget, distToSpawn, playerAlive);
         break;
       case AIState.ATTACK:
-        this.updateAttack(dt, toPlayer, distToPlayer, playerAlive);
+        this.updateAttack(dt, toTarget, distToTarget, playerAlive);
         break;
       case AIState.RETURN:
         this.updateReturn(dt, toSpawn, distToSpawn, distToPlayer, playerAlive);
@@ -79,7 +96,7 @@ export class EnemyAI {
     }
   }
 
-  private updateIdle(dt: number, distToPlayer: number, playerAlive: boolean): void {
+  private updateIdle(dt: number, distToTarget: number, distToPlayer: number, playerAlive: boolean): void {
     // Wait, then start patrolling
     this.idleTimer -= dt;
     if (this.idleTimer <= 0) {
@@ -87,15 +104,15 @@ export class EnemyAI {
       this.pickPatrolTarget();
     }
 
-    // Detect player
-    if (playerAlive && distToPlayer < this.DETECTION_RANGE) {
+    // Detect player or threat (golge askeri)
+    if ((playerAlive && distToPlayer < this.DETECTION_RANGE) || distToTarget < this.DETECTION_RANGE) {
       this.state = AIState.CHASE;
     }
   }
 
-  private updatePatrol(dt: number, distToPlayer: number, playerAlive: boolean): void {
-    // Detect player
-    if (playerAlive && distToPlayer < this.DETECTION_RANGE) {
+  private updatePatrol(dt: number, distToTarget: number, distToPlayer: number, playerAlive: boolean): void {
+    // Detect player or threat
+    if ((playerAlive && distToPlayer < this.DETECTION_RANGE) || distToTarget < this.DETECTION_RANGE) {
       this.state = AIState.CHASE;
       return;
     }
@@ -116,7 +133,7 @@ export class EnemyAI {
     toTarget.y = 0;
     const dist = toTarget.length();
 
-    if (dist < 0.5) {
+    if (dist < ENEMY_AI.patrolTargetThreshold) {
       // Reached patrol point, wait then pick new one
       this.patrolWaitTimer = this.PATROL_WAIT_MIN + Math.random() * (this.PATROL_WAIT_MAX - this.PATROL_WAIT_MIN);
       this.patrolTarget = null;
@@ -159,34 +176,56 @@ export class EnemyAI {
     this.enemy.faceDirection(dir);
   }
 
-  private updateAttack(dt: number, toPlayer: Vector3, distToPlayer: number, playerAlive: boolean): void {
-    // Player escaped or died
-    if (!playerAlive || distToPlayer > this.ATTACK_RANGE * 1.5) {
+  private updateAttack(dt: number, toTarget: Vector3, distToTarget: number, playerAlive: boolean): void {
+    // Target escaped
+    if (distToTarget > this.ATTACK_RANGE * ENEMY_AI.attackRangeEscapeMultiplier) {
       this.state = AIState.CHASE;
       return;
     }
 
-    // Face player
-    const dir = toPlayer.normalize();
+    // Face target
+    const dir = toTarget.normalize();
     this.enemy.faceDirection(dir);
     this.enemy.velocity.setAll(0);
 
     // Attack on cooldown
     if (this.attackTimer <= 0) {
-      this.enemy.onAttackPlayer(this.enemy.def.damage);
-      this.attackTimer = this.ATTACK_COOLDOWN;
+      const hasThreat = this.enemy.hasThreat();
+
+      if (hasThreat) {
+        // Golge askerine saldir
+        this.enemy.onAttackThreatTarget(this.enemy.def.damage);
+        this.attackTimer = this.ATTACK_COOLDOWN;
+      } else if (playerAlive) {
+        // Oyuncuya saldir (yon kontrolu ile)
+        const playerPos = this.lastPlayerPos;
+        const facing = CombatSystem.isFacing(
+          this.enemy.position,
+          this.enemy.getRotationY(),
+          playerPos,
+        );
+        if (facing) {
+          const isBackstab = CombatSystem.isTargetBehind(
+            this.enemy.position,
+            playerPos,
+            this.playerRotY,
+          );
+          this.enemy.onAttackPlayer(this.enemy.def.damage, isBackstab);
+          this.attackTimer = this.ATTACK_COOLDOWN;
+        }
+      }
     }
   }
 
   private updateReturn(dt: number, toSpawn: Vector3, distToSpawn: number, distToPlayer: number, playerAlive: boolean): void {
     // Player came close again while returning
-    if (playerAlive && distToPlayer < this.DETECTION_RANGE * 0.7) {
+    if (playerAlive && distToPlayer < this.DETECTION_RANGE * ENEMY_AI.detectionReturnMultiplier) {
       this.state = AIState.CHASE;
       return;
     }
 
     // Reached spawn
-    if (distToSpawn < 1) {
+    if (distToSpawn < ENEMY_AI.spawnReturnThreshold) {
       this.state = AIState.IDLE;
       this.idleTimer = 1 + Math.random() * 2;
       this.enemy.velocity.setAll(0);

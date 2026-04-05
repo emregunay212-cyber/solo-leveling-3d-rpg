@@ -2,6 +2,7 @@ import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Scene } from '@babylonjs/core/scene';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+import { CAMERA } from '../config/GameConfig';
 
 /**
  * Metin2-style camera:
@@ -15,13 +16,13 @@ export class PlayerCamera {
   private scene: Scene;
 
   // Camera settings
-  private readonly ROTATION_SPEED = 0.005;
-  private readonly ZOOM_SPEED = 0.5;
-  private readonly HEIGHT_OFFSET = 1.5;
-  private readonly MIN_RADIUS = 3;
-  private readonly MAX_RADIUS = 15;
-  private readonly MIN_BETA = 0.3;
-  private readonly MAX_BETA = 1.4;
+  private readonly ROTATION_SPEED = CAMERA.rotationSpeed;
+  private readonly ZOOM_SPEED = CAMERA.zoomSpeed;
+  private readonly HEIGHT_OFFSET = CAMERA.heightOffset;
+  private readonly MIN_RADIUS = CAMERA.minRadius;
+  private readonly MAX_RADIUS = CAMERA.maxRadius;
+  private readonly MIN_BETA = CAMERA.minBeta;
+  private readonly MAX_BETA = CAMERA.maxBeta;
 
   // Right-click state: distinguish click vs drag
   private isRightMouseDown = false;
@@ -29,7 +30,7 @@ export class PlayerCamera {
   private rightMouseDragDist = 0;
   private rightMouseDownX = 0;
   private rightMouseDownY = 0;
-  private readonly DRAG_THRESHOLD = 5; // pixels moved before it counts as drag
+  private readonly DRAG_THRESHOLD = CAMERA.dragThresholdPixels; // pixels moved before it counts as drag
 
   // Callback for right-click-to-move
   private onRightClickGround: ((worldPos: Vector3) => void) | null = null;
@@ -40,9 +41,9 @@ export class PlayerCamera {
 
     this.camera = new ArcRotateCamera(
       'playerCamera',
-      -Math.PI / 2,
-      Math.PI / 3.5,
-      8,
+      CAMERA.initialAlpha,
+      CAMERA.initialBeta,
+      CAMERA.initialRadius,
       target.position.add(new Vector3(0, this.HEIGHT_OFFSET, 0)),
       scene
     );
@@ -161,5 +162,9 @@ export class PlayerCamera {
 
   public isRotating(): boolean {
     return this.isRightMouseDown && this.rightMouseDragDist >= this.DRAG_THRESHOLD;
+  }
+
+  public dispose(): void {
+    this.camera.dispose();
   }
 }

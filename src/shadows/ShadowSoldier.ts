@@ -1,0 +1,310 @@
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { Scene } from '@babylonjs/core/scene';
+import { Mesh } from '@babylonjs/core/Meshes/mesh';
+import { Ray } from '@babylonjs/core/Culling/ray';
+import { ShadowAI } from './ShadowAI';
+import { ShadowSkillRunner } from './ShadowSkillRunner';
+import { SHADOW, ENEMY_VISUAL } from '../config/GameConfig';
+import { calculateShadowStats } from './ShadowStatCalculator';
+import type { ShadowProfile, ShadowFinalStats } from './ShadowEnhancementTypes';
+import type { DamageNumbers } from '../combat/DamageNumbers';
+import type { EnemyDef } from '../enemies/Enemy';
+import type { Enemy } from '../enemies/Enemy';
+import type { GameContext } from '../core/GameContext';
+
+/**
+ * Golge asker entity.
+ * Olen dusmanin golgesi — oyuncuyu takip eder, dusmanlara saldirir.
+ */
+export class ShadowSoldier {
+  private static nextId = 0;
+
+  public mesh: Mesh;
+  public position: Vector3;
+  public hp: number;
+  public maxHp: number;
+  public damage: number;
+  public def: EnemyDef;
+  public ai: ShadowAI;
+
+  private scene: Scene;
+  private id: number;
+  private mat: StandardMaterial;
+  private hpBarBg: Mesh;
+  private hpBarFill: Mesh;
+  private fillMat: StandardMaterial;
+  private isDead = false;
+  private damageNumbers: DamageNumbers | null = null;
+  private isSelected = false;
+  private profile: ShadowProfile | null = null;
+  public finalStats: ShadowFinalStats | null = null;
+  private skillRunner: ShadowSkillRunner | null = null;
+
+  constructor(scene: Scene, spawnPos: Vector3, sourceDef: EnemyDef, profile?: ShadowProfile) {
+    this.scene = scene;
+    this.def = sourceDef;
+    this.id = ShadowSoldier.nextId++;
+    this.profile = profile ?? null;
+
+    // Stat hesaplama: profil varsa calculateShadowStats kullan, yoksa eski carpanlar
+    const stats = calculateShadowStats(sourceDef, this.profile);
+    this.finalStats = stats;
+    this.maxHp = stats.maxHp;
+    this.damage = stats.damage;
+
+    // Profil varsa HP yuzdesinden baslat
+    this.hp = this.profile
+      ? Math.round(this.maxHp * Math.max(0.01, this.profile.hpPercent))
+      : this.maxHp;
+
+    this.position = spawnPos.clone();
+
+    // Mesh — orijinal dusmanin mor kopyasi
+    const scale = sourceDef.scale * SHADOW.shadowScale;
+    this.mesh = MeshBuilder.CreateCapsule(`shadow_${this.id}`, {
+      height: ENEMY_VISUAL.bodyHeightMultiplier * scale,
+      radius: ENEMY_VISUAL.bodyRadiusMultiplier * scale,
+    }, scene);
+    this.mesh.position = spawnPos.clone();
+    this.mesh.position.y += ENEMY_VISUAL.meshYOffsetMultiplier * scale;
+
+    // Mor golge materyali
+    this.mat = new StandardMaterial(`shadowMat_${this.id}`, scene);
+    this.mat.diffuseColor = new Color3(SHADOW.color.r, SHADOW.color.g, SHADOW.color.b);
+    this.mat.emissiveColor = new Color3(SHADOW.emissive.r, SHADOW.emissive.g, SHADOW.emissive.b);
+    this.mat.alpha = SHADOW.alpha;
+    this.mesh.material = this.mat;
+
+    // HP bar (mor)
+    this.hpBarBg = MeshBuilder.CreatePlane(`shpBg_${this.id}`, {
+      width: ENEMY_VISUAL.hpBarWidth, height: ENEMY_VISUAL.hpBarHeight,
+    }, scene);
+    this.hpBarBg.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    this.hpBarBg.isPickable = false;
+    const bgMat = new StandardMaterial(`shpBgMat_${this.id}`, scene);
+    bgMat.diffuseColor = new Color3(0.1, 0.05, 0.15);
+    bgMat.emissiveColor = new Color3(0.05, 0.02, 0.08);
+    bgMat.disableLighting = true;
+    bgMat.backFaceCulling = false;
+    this.hpBarBg.material = bgMat;
+
+    this.hpBarFill = MeshBuilder.CreatePlane(`shpFill_${this.id}`, { width: 0.95, height: 0.07 }, scene);
+    this.hpBarFill.parent = this.hpBarBg;
+    this.hpBarFill.position.set(0, 0, -0.001);
+    this.hpBarFill.isPickable = false;
+    this.fillMat = new StandardMaterial(`shpFillMat_${this.id}`, scene);
+    this.fillMat.diffuseColor = new Color3(SHADOW.hpBarColor.r, SHADOW.hpBarColor.g, SHADOW.hpBarColor.b);
+    this.fillMat.emissiveColor = new Color3(0.2, 0.05, 0.3);
+    this.fillMat.disableLighting = true;
+    this.fillMat.backFaceCulling = false;
+    this.hpBarFill.material = this.fillMat;
+
+    // AI — profil statlari varsa konfigurasyona aktar
+    this.ai = new ShadowAI(
+      this.finalStats?.attackCooldown,
+      this.finalStats?.chaseSpeed,
+      this.finalStats?.patrolSpeed,
+    );
+
+    // Yetenek sistemi — profilde ogrenmis skill varsa runner olustur
+    if (this.profile && this.profile.learnedSkillIds.length > 0) {
+      this.skillRunner = new ShadowSkillRunner(this.profile.learnedSkillIds);
+    }
+  }
+
+  public update(ctx: GameContext, enemies: Enemy[], otherShadowPositions: Vector3[] = []): void {
+    if (this.isDead) return;
+    const dt = ctx.deltaTime;
+    const scale = this.def.scale * SHADOW.shadowScale;
+
+    // Skill runner tick (cooldown + buff sureleri)
+    if (this.skillRunner) {
+      this.skillRunner.update(dt);
+
+      // Periyodik iyilesme (Dark Regen)
+      const periodicHeal = this.skillRunner.getPeriodicHeal(this.maxHp);
+      if (periodicHeal > 0 && this.hp < this.maxHp) {
+        this.hp = Math.min(this.maxHp, this.hp + periodicHeal);
+        this.hpBarFill.scaling.x = Math.max(0.01, this.hp / this.maxHp);
+      }
+
+      // Shadow Step: dusmanin arkasina isinlan
+      if (this.skillRunner.shouldTeleportBehind()) {
+        const target = this.ai.getCurrentTarget();
+        if (target && target.isAlive()) {
+          const behindDir = new Vector3(
+            -Math.sin(target.getRotationY()),
+            0,
+            -Math.cos(target.getRotationY()),
+          );
+          this.position.x = target.mesh.position.x + behindDir.x * 1.5;
+          this.position.z = target.mesh.position.z + behindDir.z * 1.5;
+        }
+      }
+    }
+
+    // AI update (diger golge pozisyonlari ile separation)
+    this.ai.update(dt, this.position, ctx.player.position, enemies, otherShadowPositions);
+
+    // Saldiri + hasar sayisi goster
+    if (this.ai.shouldAttack()) {
+      const target = this.ai.getCurrentTarget();
+      if (target && target.isAlive()) {
+        // Aktif buff'lardan bonus hasar hesapla
+        const bonusPercent = this.skillRunner?.getActiveBonusDamagePercent() ?? 0;
+        const effectiveDamage = Math.round(this.damage * (1 + bonusPercent));
+
+        // Skill tetikleme: onAttack (Shadow Cleave AoE vb.)
+        const attackResult = this.skillRunner?.onAttack(target, this.position, effectiveDamage);
+        const totalDamage = effectiveDamage + (attackResult?.bonusDamage ?? 0);
+
+        target.takeDamage(totalDamage, false, this.position);
+        this.ai.resetAttackTimer();
+
+        // Lifesteal iyilesmesi
+        const lifestealHeal = this.skillRunner?.getLifestealHeal(totalDamage) ?? 0;
+        if (lifestealHeal > 0 && this.hp < this.maxHp) {
+          this.hp = Math.min(this.maxHp, this.hp + lifestealHeal);
+          this.hpBarFill.scaling.x = Math.max(0.01, this.hp / this.maxHp);
+        }
+
+        if (this.damageNumbers) {
+          this.damageNumbers.spawn(
+            target.mesh.position.add(new Vector3(0, 1.5, 0)),
+            totalDamage, 'skill',
+          );
+        }
+
+        // Hedef oldu mu? onKill tetikle
+        if (!target.isAlive() && this.skillRunner) {
+          this.skillRunner.onKill();
+        }
+      }
+    }
+
+    // Hareket
+    const vel = this.ai.velocity;
+    if (vel.lengthSquared() > 0.01) {
+      this.position.x += vel.x * dt;
+      this.position.z += vel.z * dt;
+    }
+
+    // Zemin
+    const floorY = this.getFloorY();
+    this.position.y = floorY;
+
+    // Mesh sync
+    this.mesh.position.x = this.position.x;
+    this.mesh.position.y = this.position.y + ENEMY_VISUAL.meshYOffsetMultiplier * scale;
+    this.mesh.position.z = this.position.z;
+
+    // HP bar
+    this.hpBarBg.position.x = this.mesh.position.x;
+    this.hpBarBg.position.y = this.mesh.position.y + ENEMY_VISUAL.hpBarYOffsetMultiplier * scale;
+    this.hpBarBg.position.z = this.mesh.position.z;
+
+    // Yonu dusmana cevir
+    if (vel.lengthSquared() > 0.01) {
+      this.mesh.rotation.y = Math.atan2(vel.x, vel.z);
+    }
+  }
+
+  /** Stoktan cikarken HP yuzdesini ayarla */
+  public setHpPercent(percent: number): void {
+    this.hp = Math.round(this.maxHp * Math.max(0.01, Math.min(1, percent)));
+    this.hpBarFill.scaling.x = Math.max(0.01, this.hp / this.maxHp);
+  }
+
+  public setDamageNumbers(dn: DamageNumbers): void {
+    this.damageNumbers = dn;
+  }
+
+  /** Secim gorseli — seciliyken parlak mor kenar */
+  public setSelected(selected: boolean): void {
+    this.isSelected = selected;
+    if (selected) {
+      this.mat.emissiveColor = new Color3(0.6, 0.2, 1.0);
+    } else {
+      this.mat.emissiveColor = new Color3(SHADOW.emissive.r, SHADOW.emissive.g, SHADOW.emissive.b);
+    }
+  }
+
+  public getIsSelected(): boolean { return this.isSelected; }
+
+  /** Oyuncu tarafindan zorla hedef ata */
+  public forceTarget(enemy: Enemy): void {
+    this.ai.forceTarget(enemy);
+  }
+
+  public takeDamage(amount: number): void {
+    if (this.isDead) return;
+
+    let finalDamage = amount;
+
+    // Savunma: profil bazli defense ve blockChance uygula
+    if (this.finalStats) {
+      // Savunmayi dusmanin hasarindan cikar (minimum 1 hasar)
+      finalDamage = Math.max(1, finalDamage - this.finalStats.defense);
+
+      // Block sansi: basarili olursa kalan hasari yarilat
+      if (this.finalStats.blockChance > 0 && Math.random() < this.finalStats.blockChance) {
+        finalDamage = Math.max(1, Math.round(finalDamage * 0.5));
+      }
+    }
+
+    // Skill bazli hasar azaltma (Iron Will vb.)
+    if (this.skillRunner) {
+      finalDamage = this.skillRunner.onTakeDamage(finalDamage);
+    }
+
+    this.hp = Math.max(0, this.hp - finalDamage);
+    this.hpBarFill.scaling.x = Math.max(0.01, this.hp / this.maxHp);
+
+    if (this.hp <= 0) {
+      this.die();
+    }
+  }
+
+  private die(): void {
+    this.isDead = true;
+    this.ai.onDeath();
+    this.mesh.isVisible = false;
+    this.hpBarBg.isVisible = false;
+  }
+
+  public isAlive(): boolean { return !this.isDead; }
+
+  private getFloorY(): number {
+    const origin = new Vector3(this.position.x, this.position.y + 1, this.position.z);
+    const ray = new Ray(origin, Vector3.Down(), 50);
+    const hit = this.scene.pickWithRay(ray, (m) => {
+      return m !== this.mesh && m.isPickable && m.isEnabled() &&
+        !m.name.startsWith('shadow_') && !m.name.startsWith('shp') &&
+        !m.name.startsWith('enemy_') && !m.name.startsWith('ehp') &&
+        !m.name.startsWith('dmgNum') && !m.name.startsWith('clickRing') &&
+        !m.name.startsWith('playerBody');
+    });
+    return hit?.hit && hit.pickedPoint ? hit.pickedPoint.y : 0;
+  }
+
+  /** Profilin guncel HP yuzdesiyle kopyasini dondur */
+  public getProfile(): ShadowProfile | null {
+    if (!this.profile) return null;
+    return { ...this.profile, hpPercent: this.maxHp > 0 ? this.hp / this.maxHp : 0 };
+  }
+
+  /** Hedef olduruldu — ordu veya AI tarafindan cagirilir */
+  public onTargetKilled(): void {
+    // Profil varsa kill sayacini artirmak icin uid saklanir;
+    // gercek artirma ShadowArmy veya dis sistem tarafindan profileManager uzerinden yapilir
+  }
+
+  public dispose(): void {
+    this.mesh.dispose();
+    this.hpBarBg.dispose();
+    this.hpBarFill.dispose();
+  }
+}

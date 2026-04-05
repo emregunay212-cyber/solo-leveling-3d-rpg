@@ -198,7 +198,9 @@ export class StatsUI {
 
     (document.getElementById('stats-derived') as HTMLDivElement).innerHTML = `
       Saldiri: ${ls.getAttackDamage()} | Maks HP: ${ls.getMaxHp()} | Maks MP: ${ls.getMaxMp()}<br>
-      Kritik Sans: %${(ls.getCritChance() * 100).toFixed(1)} | Saldiri Hizi: x${ls.getAttackSpeed().toFixed(1)} | Hiz: ${ls.getMoveSpeed().toFixed(1)}
+      Kritik Sans: %${(ls.getCritChance() * 100).toFixed(1)} | Saldiri Hizi: x${ls.getAttackSpeed().toFixed(1)} | Hiz: ${ls.getMoveSpeed().toFixed(1)}<br>
+      Savunma: ${ls.getDefense().toFixed(0)} | Pasif Azaltma: %${(ls.getDamageReduction() * 100).toFixed(1)}<br>
+      Parry Sans: %${(ls.getParryChance() * 100).toFixed(1)} | Blok Azaltma: %${(ls.getBlockReduction() * 100).toFixed(0)}
     `;
   }
 

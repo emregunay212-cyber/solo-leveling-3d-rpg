@@ -6,6 +6,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
 import { HavokPlugin } from '@babylonjs/core/Physics/v2/Plugins/havokPlugin';
 import HavokPhysics from '@babylonjs/havok';
+import { ENGINE } from '../config/GameConfig';
 
 export class Engine {
   public babylonEngine: BabylonEngine;
@@ -28,11 +29,11 @@ export class Engine {
     });
 
     this.scene = new Scene(this.babylonEngine);
-    this.scene.clearColor = new Color4(0.05, 0.05, 0.1, 1);
-    this.scene.ambientColor = new Color3(0.1, 0.1, 0.15);
+    this.scene.clearColor = new Color4(ENGINE.clearColor.r, ENGINE.clearColor.g, ENGINE.clearColor.b, 1);
+    this.scene.ambientColor = new Color3(ENGINE.ambientColor.r, ENGINE.ambientColor.g, ENGINE.ambientColor.b);
     this.scene.fogMode = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.002;
-    this.scene.fogColor = new Color3(0.05, 0.05, 0.1);
+    this.scene.fogDensity = ENGINE.fog.density;
+    this.scene.fogColor = new Color3(ENGINE.fog.color.r, ENGINE.fog.color.g, ENGINE.fog.color.b);
 
     this.setupLights();
     this.setupResize();
@@ -41,8 +42,7 @@ export class Engine {
   public async initPhysics(): Promise<void> {
     const havokInstance = await HavokPhysics();
     const havokPlugin = new HavokPlugin(true, havokInstance);
-    this.scene.enablePhysics(new Vector3(0, -9.81, 0), havokPlugin);
-    console.log('Havok physics engine initialized');
+    this.scene.enablePhysics(new Vector3(0, ENGINE.gravity, 0), havokPlugin);
   }
 
   private setupLights(): void {
@@ -51,17 +51,17 @@ export class Engine {
       new Vector3(0, 1, 0),
       this.scene
     );
-    this.ambientLight.intensity = 0.5;
-    this.ambientLight.diffuse = new Color3(0.8, 0.8, 0.9);
-    this.ambientLight.groundColor = new Color3(0.2, 0.2, 0.3);
+    this.ambientLight.intensity = ENGINE.ambientLight.intensity;
+    this.ambientLight.diffuse = new Color3(ENGINE.ambientLight.diffuse.r, ENGINE.ambientLight.diffuse.g, ENGINE.ambientLight.diffuse.b);
+    this.ambientLight.groundColor = new Color3(ENGINE.ambientLight.groundColor.r, ENGINE.ambientLight.groundColor.g, ENGINE.ambientLight.groundColor.b);
 
     this.sunLight = new DirectionalLight(
       'sunLight',
-      new Vector3(-1, -2, -1).normalize(),
+      new Vector3(ENGINE.sunLight.direction.x, ENGINE.sunLight.direction.y, ENGINE.sunLight.direction.z).normalize(),
       this.scene
     );
-    this.sunLight.intensity = 0.8;
-    this.sunLight.diffuse = new Color3(1, 0.95, 0.85);
+    this.sunLight.intensity = ENGINE.sunLight.intensity;
+    this.sunLight.diffuse = new Color3(ENGINE.sunLight.diffuse.r, ENGINE.sunLight.diffuse.g, ENGINE.sunLight.diffuse.b);
   }
 
   private setupResize(): void {
