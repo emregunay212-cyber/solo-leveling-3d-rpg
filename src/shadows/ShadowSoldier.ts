@@ -189,7 +189,7 @@ export class ShadowSoldier {
           if (!enemy.isAlive()) continue;
           const dist = enemy.mesh.position.subtract(this.position).length();
           if (dist <= periodicAoe.aoeRadius) {
-            enemy.takeDamage(periodicAoe.damage, false, this.position);
+            enemy.takeDamage(periodicAoe.damage, false, this.position, true);
             if (this.damageNumbers) {
               this.damageNumbers.spawn(
                 enemy.mesh.position.add(new Vector3(0, 1.5, 0)),
@@ -234,7 +234,7 @@ export class ShadowSoldier {
         const attackResult = this.skillRunner?.onAttack(target, this.position, effectiveDamage, nearbyAllies);
         const totalDamage = effectiveDamage + (attackResult?.bonusDamage ?? 0);
 
-        target.takeDamage(totalDamage, false, this.position);
+        target.takeDamage(totalDamage, false, this.position, true);
         this.ai.resetAttackTimer();
 
         // Lifesteal iyilesmesi

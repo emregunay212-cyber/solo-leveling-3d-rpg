@@ -181,7 +181,7 @@ export class Enemy implements Damageable {
     }
   }
 
-  public takeDamage(amount: number, isCritical: boolean, attackerPos: Vector3): void {
+  public takeDamage(amount: number, isCritical: boolean, attackerPos: Vector3, fromShadow = false): void {
     if (this.isDead) return;
 
     // Savunma hesaplamasi: defense gelen hasardan dusulur (min 1)
@@ -189,9 +189,11 @@ export class Enemy implements Damageable {
     const reducedAmount = defense > 0 ? Math.max(1, amount - defense) : amount;
     this.hp = Math.max(0, this.hp - reducedAmount);
 
-    // Threat: saldirganin pozisyonunu kaydet (golge askerler icin)
-    this.threatPos = attackerPos.clone();
-    this.threatTimer = SHADOW.threatDuration;
+    // Threat: sadece golge saldirisi olduğunda set et (oyuncu saldirisi threat olusturmaz)
+    if (fromShadow) {
+      this.threatPos = attackerPos.clone();
+      this.threatTimer = SHADOW.threatDuration;
+    }
 
     // Flash white
     this.hitFlashTimer = ENEMY_VISUAL.hitFlashDuration;
