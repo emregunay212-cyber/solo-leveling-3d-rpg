@@ -6,6 +6,7 @@
  */
 
 import { SHADOW_ENHANCEMENT } from '../config/GameConfig';
+import { SKILL_BOOK_DEFS } from '../data/shadowSkillBooks';
 import type { EnemyDef } from '../enemies/Enemy';
 import type { ShadowProfile, ShadowFinalStats, PlayerStats, ShadowRank } from './ShadowEnhancementTypes';
 
@@ -54,6 +55,7 @@ export interface StatBreakdown {
   readonly base: number;    // düşman def'ten gelen minimum
   readonly player: number;  // oyuncu stat kopyasından gelen
   readonly rank: number;    // rank bonusu (sadece boss)
+  readonly skill: number;   // yetenek etkisi (damageMultiplier vb.)
   readonly total: number;
 }
 
@@ -62,6 +64,7 @@ export interface ShadowStatsBreakdown {
   readonly damage: StatBreakdown;
   readonly defense: StatBreakdown;
   readonly attackCooldown: number;
+  readonly hitDamage: number;  // duz vurus hasari (skill dahil)
 }
 
 export function calculateShadowStatsBreakdown(
@@ -99,10 +102,26 @@ export function calculateShadowStatsBreakdown(
 
   const attackCooldown: number = Math.max(0.5, 2.0 / (1 + playerStats.attackSpeed * rankPct * 0.3));
 
+  // Skill damage multiplier hesapla (always-active onAttack skilleri)
+  const skillIds = profile?.shadowSkillIds ?? enemyDef.shadowSkillIds ?? [];
+  let skillDmgMultiplier = 0;
+  for (const sid of skillIds) {
+    const skill = SKILL_BOOK_DEFS[sid];
+    if (skill && skill.trigger === 'onAttack' && skill.effect.damageMultiplier && skill.effect.damageMultiplier > 1) {
+      // Cooldown'suz olanlar her vuruşta (heavy_strike, pack_bonus vb.)
+      if (skill.cooldown <= 0) {
+        skillDmgMultiplier += skill.effect.damageMultiplier - 1;
+      }
+    }
+  }
+  const skillDmg = Math.round(totalDmg * skillDmgMultiplier);
+  const hitDamage = totalDmg + skillDmg;
+
   return {
-    maxHp: { base: baseHp, player: Math.max(0, playerHp - baseHp), rank: rankHp, total: totalHp },
-    damage: { base: baseDmg, player: Math.max(0, playerDmg - baseDmg), rank: rankDmg, total: totalDmg },
-    defense: { base: baseDef, player: playerDef, rank: rankDef, total: totalDef },
+    maxHp: { base: baseHp, player: Math.max(0, playerHp - baseHp), rank: rankHp, skill: 0, total: totalHp },
+    damage: { base: baseDmg, player: Math.max(0, playerDmg - baseDmg), rank: rankDmg, skill: skillDmg, total: totalDmg + skillDmg },
+    defense: { base: baseDef, player: playerDef, rank: rankDef, skill: 0, total: totalDef },
     attackCooldown,
+    hitDamage,
   };
 }

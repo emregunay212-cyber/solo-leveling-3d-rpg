@@ -369,10 +369,12 @@ export class ShadowManageUI {
         if (bd.base > 0) parts.push(`<span style="color:#aaa">${bd.base}</span>`);
         if (bd.player > 0) parts.push(`<span style="color:#4ade80">+${bd.player}</span>`);
         if (bd.rank > 0) parts.push(`<span style="color:#f59e0b">+${bd.rank}</span>`);
+        if (bd.skill > 0) parts.push(`<span style="color:#60a5fa">+${bd.skill}</span>`);
         const detail = parts.length > 1 ? ` (${parts.join(' ')})` : '';
         return `<div class="smu-stat-row"><span>${label}</span><span class="smu-stat-val"><span style="color:#e0d4fc;font-weight:700">${bd.total}</span>${detail}</span></div>`;
       };
       html += bk('Maks HP', breakdown.maxHp);
+      html += `<div class="smu-stat-row"><span>Duz Vurus</span><span class="smu-stat-val" style="color:#ff6b6b;font-weight:700">${breakdown.hitDamage}</span></div>`;
       html += bk('Hasar', breakdown.damage);
       html += bk('Savunma', breakdown.defense);
       html += `<div class="smu-stat-row"><span>Saldiri Hizi</span><span class="smu-stat-val">${breakdown.attackCooldown.toFixed(2)}s</span></div>`;
