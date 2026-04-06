@@ -207,21 +207,15 @@ export class EnemyAI {
         this.enemy.onAttackThreatTarget(this.enemy.def.damage);
         this.attackTimer = this.ATTACK_COOLDOWN;
       } else if (playerAlive) {
-        // Oyuncuya saldir
-        // Zaten faceDirection ile hedefe donuldugu icin, saldiri menzilindeyse
-        // dogrudan saldir. Cok yakin mesafede isFacing yanlis sonuc veriyor.
+        // Oyuncuya saldir — saldiri menzilinde ve hedefe donmus durumda
         const playerPos = this.lastPlayerPos;
-        const canAttack = distToTarget < this.ATTACK_RANGE * 0.8
-          || CombatSystem.isFacing(this.enemy.position, this.enemy.getRotationY(), playerPos);
-        if (canAttack) {
-          const isBackstab = CombatSystem.isTargetBehind(
-            this.enemy.position,
-            playerPos,
-            this.playerRotY,
-          );
-          this.enemy.onAttackPlayer(this.enemy.def.damage, isBackstab);
-          this.attackTimer = this.ATTACK_COOLDOWN;
-        }
+        const isBackstab = CombatSystem.isTargetBehind(
+          this.enemy.position,
+          playerPos,
+          this.playerRotY,
+        );
+        this.enemy.onAttackPlayer(this.enemy.def.damage, isBackstab);
+        this.attackTimer = this.ATTACK_COOLDOWN;
       }
     }
   }
