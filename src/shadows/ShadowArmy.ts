@@ -270,6 +270,22 @@ export class ShadowArmy {
     return this.soulSlots;
   }
 
+  /** Soul slot verilerini disaridan yukle (sahne gecisinde koruma icin) */
+  public setSoulSlots(slots: SoulSlot[]): void {
+    this.soulSlots = slots;
+  }
+
+  /** Soul slot verilerinin kopyasini dondur (sahne gecisinde kaydetmek icin) */
+  public exportSoulSlots(): SoulSlot[] {
+    return this.soulSlots.map(s => ({
+      enemyDefId: s.enemyDefId,
+      enemyDef: s.enemyDef,
+      count: s.count,
+      hpPercents: [...s.hpPercents],
+      profiles: [...s.profiles],
+    }));
+  }
+
   // ─── KILL TRACKING ───
 
   /** Golge askerine kill callback'i bagla — profileManager uzerinden kill sayacini arttirir */

@@ -180,6 +180,10 @@ export class TestScene implements GameScene {
     // Shadow army + selection (pass playerStats and profileManager)
     this.shadowArmy = new ShadowArmy(this.game.engine.scene, this.getPlayerStats(), this.shadowProfileManager);
     this.shadowArmy.setDamageNumbers(this.game.damageNumbers);
+    // Kayitli soul slot'lari yukle (dungeon'dan donus)
+    if (this.game.savedSoulSlots) {
+      this.shadowArmy.setSoulSlots(this.game.savedSoulSlots);
+    }
     this.shadowSelection = new ShadowSelection(this.game.engine.scene, this.shadowArmy, this.game.input);
     this.shadowSelection.setDamageNumbers(this.game.damageNumbers);
 
@@ -612,6 +616,7 @@ export class TestScene implements GameScene {
     this.game.shadowProfileManager = this.shadowProfileManager;
     this.game.shadowInventory = this.shadowInventory;
     this.game.gold = this.gold;
+    this.game.savedSoulSlots = this.shadowArmy.exportSoulSlots();
     this.game.dungeonRank = rank;
 
     // DungeonScene'e rank aktar ve sahne degistir

@@ -306,6 +306,7 @@ export class DungeonScene implements GameScene {
     this.game.shadowProfileManager = this.shadowProfileManager;
     this.game.shadowInventory = this.shadowInventory;
     this.game.gold = this.gold;
+    this.game.savedSoulSlots = this.shadowArmy.exportSoulSlots();
 
     // Tum kaynaklari temizle (geri donuste onLoad tekrar olusturur)
     if (this.keyHandler) {
@@ -500,6 +501,10 @@ export class DungeonScene implements GameScene {
       this.game.engine.scene, this.getPlayerStats(), this.shadowProfileManager,
     );
     this.shadowArmy.setDamageNumbers(this.game.damageNumbers);
+    // Kayitli soul slot'lari yukle
+    if (this.game.savedSoulSlots) {
+      this.shadowArmy.setSoulSlots(this.game.savedSoulSlots);
+    }
     this.shadowSelection = new ShadowSelection(
       this.game.engine.scene, this.shadowArmy, this.game.input,
     );
