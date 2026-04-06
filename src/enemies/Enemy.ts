@@ -17,6 +17,7 @@ export interface EnemyDef {
   name: string;
   hp: number;
   damage: number;
+  defense?: number;        // savunma — gelen hasardan dusulur
   xpReward: number;
   goldReward: number;
   color: Color3;
@@ -176,7 +177,11 @@ export class Enemy implements Damageable {
 
   public takeDamage(amount: number, isCritical: boolean, attackerPos: Vector3): void {
     if (this.isDead) return;
-    this.hp = Math.max(0, this.hp - amount);
+
+    // Savunma hesaplamasi: defense gelen hasardan dusulur (min 1)
+    const defense = this.def.defense ?? 0;
+    const reducedAmount = defense > 0 ? Math.max(1, amount - defense) : amount;
+    this.hp = Math.max(0, this.hp - reducedAmount);
 
     // Threat: saldirganin pozisyonunu kaydet (golge askerler icin)
     this.threatPos = attackerPos.clone();

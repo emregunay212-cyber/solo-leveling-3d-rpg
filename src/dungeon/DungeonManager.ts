@@ -60,6 +60,7 @@ export class DungeonManager {
         ...baseDef,
         hp: Math.round(baseDef.hp * multiplier),
         damage: Math.round(baseDef.damage * multiplier),
+        defense: Math.round((baseDef.defense ?? 0) * multiplier),
         xpReward: Math.round(baseDef.xpReward * DUNGEON.rewards.xpMultiplier[this.rank]),
         goldReward: Math.round(baseDef.goldReward * DUNGEON.rewards.goldMultiplier[this.rank]),
       };
@@ -83,6 +84,7 @@ export class DungeonManager {
         ...bossDef,
         hp: Math.round(bossDef.hp * multiplier * DUNGEON.bossHpMultiplier),
         damage: Math.round(bossDef.damage * multiplier * DUNGEON.bossDamageMultiplier),
+        defense: Math.round((bossDef.defense ?? 0) * multiplier * 2),
       },
     };
   }
