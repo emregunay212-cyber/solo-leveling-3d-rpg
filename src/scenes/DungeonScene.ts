@@ -27,6 +27,7 @@ import { LevelSystem } from '../progression/LevelSystem';
 import { DUNGEON, SCENE, SHADOW, SKILLS, MP } from '../config/GameConfig';
 import { DUNGEON_RANK_DEFS } from '../dungeon/DungeonDefs';
 import { ENEMY_DEFS } from '../data/enemies';
+import { DUNGEON_BOSS_DEFS } from '../data/dungeonBosses';
 import { eventBus } from '../core/EventBus';
 import { createGameContext } from '../core/GameContext';
 import { DeathScreen } from '../ui/DeathScreen';
@@ -42,6 +43,7 @@ import { ShadowInventory } from '../systems/ShadowInventory';
 import { DropSystem } from '../systems/DropSystem';
 import { DungeonManager } from '../dungeon/DungeonManager';
 import { ShadowStockPicker } from '../ui/ShadowStockPicker';
+import { ShadowManageUI } from '../ui/ShadowManageUI';
 import { initDevConsole, disposeDevConsole } from '../systems/DevConsole';
 import type { DungeonRank } from '../dungeon/types';
 import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
@@ -109,6 +111,7 @@ export class DungeonScene implements GameScene {
 
   // Soul stok sistemi
   private shadowStockPicker!: ShadowStockPicker;
+  private shadowManageUI!: ShadowManageUI;
   private readonly STOCK_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4'];
   private stockKeyStates = [false, false, false, false];
 
@@ -335,6 +338,7 @@ export class DungeonScene implements GameScene {
     if (this.exitPortal) { this.exitPortal.dispose(); }
     if (this.victoryPortal) { this.victoryPortal.dispose(); this.victoryPortal = null; }
     this.shadowStockPicker?.dispose();
+    this.shadowManageUI?.dispose();
     disposeDevConsole();
   }
 
@@ -535,8 +539,18 @@ export class DungeonScene implements GameScene {
     this.skillBar.initSlots(this.skillSystem.getSlots());
     this.shadowUI = new ShadowUI();
 
-    // Tab key toggles stats, G toggles shadow mode
+    this.shadowManageUI = new ShadowManageUI(
+      this.shadowProfileManager,
+      this.shadowInventory,
+      (name: string) => ENEMY_DEFS[name] ?? DUNGEON_BOSS_DEFS[name] ?? null,
+    );
+
+    // Tab = golge yonetim, P = stat dagitim (dungeon icinde degistirilemez ama gorulebilir), G = mod
     this.keyHandler = (e: KeyboardEvent): void => {
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        this.shadowManageUI.toggle();
+      }
       if (e.code === 'KeyG') {
         const newMode = this.shadowArmy.toggleMode();
         this.shadowUI.updateMode(newMode);
