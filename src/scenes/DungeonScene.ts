@@ -587,6 +587,7 @@ export class DungeonScene implements GameScene {
       this.gold += e.def.goldReward;
       this.dropSystem.rollDrops(typeKey, e.def.level);
       this.dropSystem.addGold(e.def.goldReward);
+      this.game.hud.showXpGain(e.def.xpReward);
       this.updateHUD();
     });
 
@@ -646,6 +647,7 @@ export class DungeonScene implements GameScene {
       this.dungeonManager.addGold(e.def.goldReward);
       this.levelSystem.addXp(e.def.xpReward);
       this.gold += e.def.goldReward;
+      this.game.hud.showXpGain(e.def.xpReward);
       this.updateHUD();
 
       const rankDef = DUNGEON_RANK_DEFS[this.rank];
