@@ -581,6 +581,8 @@ export class DungeonScene implements GameScene {
     enemy.setOnDeath((e) => {
       this.game.combatSystem.unregisterTarget(enemy);
       // XP ve gold hem dungeon sayacina hem oyuncuya
+      const xpBefore = this.levelSystem.xp;
+      const lvBefore = this.levelSystem.level;
       this.dungeonManager.addXp(e.def.xpReward);
       this.dungeonManager.addGold(e.def.goldReward);
       this.levelSystem.addXp(e.def.xpReward);
@@ -588,6 +590,7 @@ export class DungeonScene implements GameScene {
       this.dropSystem.rollDrops(typeKey, e.def.level);
       this.dropSystem.addGold(e.def.goldReward);
       this.game.hud.showXpGain(e.def.xpReward);
+      console.log(`[DUNGEON] Dusman oldu: +${e.def.xpReward} XP | XP: ${xpBefore} → ${this.levelSystem.xp} | LV: ${lvBefore} → ${this.levelSystem.level}`);
       this.updateHUD();
     });
 
