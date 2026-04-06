@@ -41,6 +41,7 @@ import { ShadowProfileManager } from '../shadows/ShadowProfileManager';
 import { ShadowInventory } from '../systems/ShadowInventory';
 import { DropSystem } from '../systems/DropSystem';
 import { DungeonManager } from '../dungeon/DungeonManager';
+import { ShadowStockPicker } from '../ui/ShadowStockPicker';
 import type { DungeonRank } from '../dungeon/types';
 import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
 
@@ -104,6 +105,11 @@ export class DungeonScene implements GameScene {
   private bossSpawnTimer = -1;
   private bossSpawned = false;
   private entryGracePeriod = 2; // ilk 2sn portal tetiklenmez
+
+  // Soul stok sistemi
+  private shadowStockPicker!: ShadowStockPicker;
+  private readonly STOCK_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4'];
+  private stockKeyStates = [false, false, false, false];
 
   constructor(game: Game) {
     this.game = game;
@@ -247,6 +253,7 @@ export class DungeonScene implements GameScene {
     this.shadowUI.updateCount(this.shadowArmy.getAliveCount());
     this.shadowUI.updateSoulSlots(this.shadowArmy.getSoulSlots());
     this.shadowUI.updateMode(this.shadowArmy.getMode());
+    this.updateSoulSummon();
 
     // Boss spawn zamanlayici
     if (this.bossSpawnTimer > 0) {
@@ -293,6 +300,11 @@ export class DungeonScene implements GameScene {
       rewards,
     });
 
+    // Paylasilan state'i game'e geri yaz (TestScene bunlari okuyacak)
+    this.game.levelSystem = this.levelSystem;
+    this.game.shadowProfileManager = this.shadowProfileManager;
+    this.game.shadowInventory = this.shadowInventory;
+
     // Tum kaynaklari temizle (geri donuste onLoad tekrar olusturur)
     if (this.keyHandler) {
       window.removeEventListener('keydown', this.keyHandler);
@@ -319,7 +331,7 @@ export class DungeonScene implements GameScene {
     this.shadowUI?.dispose();
     if (this.exitPortal) { this.exitPortal.dispose(); }
     if (this.victoryPortal) { this.victoryPortal.dispose(); this.victoryPortal = null; }
-    // DungeonHUD henuz field olarak tanimlanmamis — ilerde eklenecek
+    this.shadowStockPicker?.dispose();
   }
 
   onDispose(): void {
@@ -524,6 +536,8 @@ export class DungeonScene implements GameScene {
     window.addEventListener('keydown', this.keyHandler);
 
     this.setupShadowControls(scene);
+    this.setupSoulStockControls(scene);
+    this.shadowStockPicker = new ShadowStockPicker();
 
     this.game.playerCamera.setOnRightClickGround((worldPos) => {
       this.game.player.setAutoMoveTarget(worldPos);
@@ -566,8 +580,11 @@ export class DungeonScene implements GameScene {
 
     enemy.setOnDeath((e) => {
       this.game.combatSystem.unregisterTarget(enemy);
+      // XP ve gold hem dungeon sayacina hem oyuncuya
       this.dungeonManager.addXp(e.def.xpReward);
       this.dungeonManager.addGold(e.def.goldReward);
+      this.levelSystem.addXp(e.def.xpReward);
+      this.gold += e.def.goldReward;
       this.dropSystem.rollDrops(typeKey, e.def.level);
       this.dropSystem.addGold(e.def.goldReward);
       this.updateHUD();
@@ -627,6 +644,8 @@ export class DungeonScene implements GameScene {
       this.game.combatSystem.unregisterTarget(boss);
       this.dungeonManager.addXp(e.def.xpReward);
       this.dungeonManager.addGold(e.def.goldReward);
+      this.levelSystem.addXp(e.def.xpReward);
+      this.gold += e.def.goldReward;
       this.updateHUD();
 
       const rankDef = DUNGEON_RANK_DEFS[this.rank];
@@ -881,6 +900,59 @@ export class DungeonScene implements GameScene {
     } else {
       this.game.damageNumbers.spawn(pos.add(new Vector3(0, 2, 0)), 0, 'extract_fail');
       enemy.markExtracted();
+    }
+  }
+
+  // ─── SOUL STOK KONTROLLERI ───
+
+  private setupSoulStockControls(scene: Scene): void {
+    const canvas = scene.getEngine().getRenderingCanvas()!;
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || e.altKey) return;
+      let slotIndex = -1;
+      for (let i = 0; i < 4; i++) {
+        if (this.game.input.isKeyDown(this.STOCK_KEYS[i])) { slotIndex = i; break; }
+      }
+      if (slotIndex === -1) return;
+      const pickResult = scene.pick(scene.pointerX, scene.pointerY, (mesh) => mesh.name.startsWith('shadow_'));
+      if (!pickResult?.hit || !pickResult.pickedMesh) return;
+      const shadow = this.shadowArmy.getShadows().find(s => s.mesh === pickResult.pickedMesh && s.isAlive());
+      if (!shadow) return;
+      const success = this.shadowArmy.stockShadow(slotIndex, shadow);
+      if (success) {
+        this.game.damageNumbers.spawn(shadow.mesh.position.add(new Vector3(0, 1.5, 0)), 0, 'skill');
+      }
+    });
+  }
+
+  private updateSoulSummon(): void {
+    const altDown = this.game.input.isKeyDown('AltLeft') || this.game.input.isKeyDown('AltRight');
+    if (!altDown) { this.stockKeyStates = [false, false, false, false]; return; }
+    if (this.shadowStockPicker.isOpen()) return;
+    for (let i = 0; i < 4; i++) {
+      const isDown = this.game.input.isKeyDown(this.STOCK_KEYS[i]);
+      if (isDown && !this.stockKeyStates[i]) {
+        const slots = this.shadowArmy.getSoulSlots();
+        const slot = slots[i];
+        if (!slot || !slot.enemyDef || slot.count <= 0) { this.stockKeyStates[i] = isDown; continue; }
+        if (slot.count === 1) {
+          const playerPos = this.game.player.getPosition().clone();
+          const offset = this.game.player.getForwardDirection().scale(-SHADOW.summonOffsetDistance);
+          const spawnPos = playerPos.add(offset); spawnPos.y = 0;
+          const success = this.shadowArmy.summonFromStock(i, spawnPos, this.levelSystem.level);
+          if (success) { this.game.damageNumbers.spawn(spawnPos.add(new Vector3(0, 2, 0)), 0, 'arise'); }
+        } else {
+          const slotIndex = i;
+          this.shadowStockPicker.open(slot, slotIndex, (profileIndex: number) => {
+            const playerPos = this.game.player.getPosition().clone();
+            const offset = this.game.player.getForwardDirection().scale(-SHADOW.summonOffsetDistance);
+            const spawnPos = playerPos.add(offset); spawnPos.y = 0;
+            const success = this.shadowArmy.summonFromStockByIndex(slotIndex, profileIndex, spawnPos);
+            if (success) { this.game.damageNumbers.spawn(spawnPos.add(new Vector3(0, 2, 0)), 0, 'arise'); }
+          });
+        }
+      }
+      this.stockKeyStates[i] = isDown;
     }
   }
 
