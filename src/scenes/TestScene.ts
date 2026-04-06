@@ -20,6 +20,7 @@ import { Enemy } from '../enemies/Enemy';
 import { LevelSystem } from '../progression/LevelSystem';
 import { RespawnManager } from '../systems/RespawnManager';
 import { ENEMY_DEFS } from '../data/enemies';
+import { DUNGEON_BOSS_DEFS } from '../data/dungeonBosses';
 import { SCENE } from '../config/GameConfig';
 import { eventBus } from '../core/EventBus';
 import { createGameContext } from '../core/GameContext';
@@ -235,7 +236,7 @@ export class TestScene implements GameScene {
     this.shadowManageUI = new ShadowManageUI(
       this.shadowProfileManager,
       this.shadowInventory,
-      (name: string) => ENEMY_DEFS[name] ?? null,
+      (name: string) => ENEMY_DEFS[name] ?? DUNGEON_BOSS_DEFS[name] ?? null,
     );
     this.shadowStockPicker = new ShadowStockPicker();
 

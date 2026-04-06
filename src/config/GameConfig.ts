@@ -299,8 +299,8 @@ export const DUNGEON = {
   arenaSize: { E: 40, D: 45, C: 50, B: 55, A: 60, S: 70 },
   statMultiplier: { E: 1, D: 1.5, C: 2.5, B: 4, A: 6, S: 10 },
   enemyCount: { E: 8, D: 10, C: 12, B: 14, A: 16, S: 20 },
-  bossHpMultiplier: 5,
-  bossDamageMultiplier: 3,
+  bossHpMultiplier: 8,
+  bossDamageMultiplier: 4,
   recommendedLevel: { E: 1, D: 5, C: 10, B: 20, A: 35, S: 60 },
   rewards: {
     xpMultiplier: { E: 1, D: 2, C: 3, B: 5, A: 8, S: 15 },
