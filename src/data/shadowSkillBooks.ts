@@ -125,6 +125,136 @@ const enemy_hellfire: ShadowSkillDef = {
   sellPrice: 0,
 } as const;
 
+const enemy_web_slow: ShadowSkillDef = {
+  id: 'enemy_web_slow',
+  name: 'Ag Yavaslatma',
+  type: 'passive',
+  trigger: 'onAttack',
+  description: 'Hedefi 3sn yavaslatir',
+  cooldown: 6,
+  requiredLevel: 0,
+  effect: { durationSeconds: 3, statBuff: { bonusMoveSpeed: -2 } },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_swarm: ShadowSkillDef = {
+  id: 'enemy_swarm',
+  name: 'Suru Saldirisi',
+  type: 'passive',
+  trigger: 'onAttack',
+  description: 'Zayif ama surekli saldiri +%10 hasar',
+  cooldown: 0,
+  requiredLevel: 0,
+  effect: { damageMultiplier: 1.1 },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_frost_bite: ShadowSkillDef = {
+  id: 'enemy_frost_bite',
+  name: 'Buz Isirigi',
+  type: 'passive',
+  trigger: 'onAttack',
+  description: 'Hedefin saldiri hizini dusurur',
+  cooldown: 5,
+  requiredLevel: 0,
+  effect: { durationSeconds: 4, statBuff: { bonusAttackSpeed: 0.5 } },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_frenzy: ShadowSkillDef = {
+  id: 'enemy_frenzy',
+  name: 'Cinnet',
+  type: 'passive',
+  trigger: 'onKill',
+  description: 'Oldurme sonrasi 8sn +%30 hasar',
+  cooldown: 0,
+  requiredLevel: 0,
+  effect: { durationSeconds: 8, statBuff: { bonusDamagePercent: 0.3 } },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_dark_magic: ShadowSkillDef = {
+  id: 'enemy_dark_magic',
+  name: 'Karanlik Buyu',
+  type: 'passive',
+  trigger: 'onAttack',
+  description: 'AoE karanlik buyu hasari',
+  cooldown: 4,
+  requiredLevel: 0,
+  effect: { aoeRadius: 4, damageMultiplier: 1.8 },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_fire_breath: ShadowSkillDef = {
+  id: 'enemy_fire_breath',
+  name: 'Ates Nefesi',
+  type: 'passive',
+  trigger: 'periodic',
+  description: 'Genis alan ates nefesi',
+  cooldown: 5,
+  requiredLevel: 0,
+  effect: { aoeRadius: 5, damageMultiplier: 2.5 },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_summon_minion: ShadowSkillDef = {
+  id: 'enemy_summon_minion',
+  name: 'Usak Cagirma',
+  type: 'passive',
+  trigger: 'periodic',
+  description: 'Usak cagirma (lezzetlik)',
+  cooldown: 10,
+  requiredLevel: 0,
+  effect: { damageMultiplier: 0 },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_triple_strike: ShadowSkillDef = {
+  id: 'enemy_triple_strike',
+  name: 'Uclu Vurus',
+  type: 'passive',
+  trigger: 'onAttack',
+  description: '3 basli saldiri +%25 hasar',
+  cooldown: 0,
+  requiredLevel: 0,
+  effect: { damageMultiplier: 1.25 },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_shadow_clone: ShadowSkillDef = {
+  id: 'enemy_shadow_clone',
+  name: 'Golge Klonu',
+  type: 'passive',
+  trigger: 'periodic',
+  description: 'Golge klonu olusturma (lezzetlik)',
+  cooldown: 12,
+  requiredLevel: 0,
+  effect: { damageMultiplier: 0 },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
+const enemy_drain_life: ShadowSkillDef = {
+  id: 'enemy_drain_life',
+  name: 'Hayat Emme',
+  type: 'passive',
+  trigger: 'onAttack',
+  description: 'Verilen hasarin %12si kadar iyiles',
+  cooldown: 0,
+  requiredLevel: 0,
+  effect: { healPercent: 0.12 },
+  buyPrice: 0,
+  sellPrice: 0,
+} as const;
+
 // ─── B) OYUNCU YETENEK KITAPLARI (drop olarak duser) ───
 
 const book_shadow_blade_up: ShadowSkillDef = {
@@ -439,6 +569,16 @@ export const ENEMY_SKILL_DEFS: Readonly<Record<string, ShadowSkillDef>> = {
   enemy_shadow_cleave,
   enemy_lifesteal,
   enemy_hellfire,
+  enemy_web_slow,
+  enemy_swarm,
+  enemy_frost_bite,
+  enemy_frenzy,
+  enemy_dark_magic,
+  enemy_fire_breath,
+  enemy_summon_minion,
+  enemy_triple_strike,
+  enemy_shadow_clone,
+  enemy_drain_life,
 } as const;
 
 /** Oyuncu yetenek kitaplari — dusmanlardan duser, oyuncunun Q/E/R/F'ini guclendirir veya yeni yetenek ogretir */
