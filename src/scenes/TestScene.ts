@@ -938,6 +938,7 @@ export class TestScene implements GameScene {
   }
 
   onExit(): void {
+    console.log('[TEST] onExit basliyor — kaynaklar temizleniyor');
     // Sahne degistiginde tum kaynaklari temizle (geri donuste onLoad tekrar olusturur)
     if (this.keyHandler) {
       window.removeEventListener('keydown', this.keyHandler);

@@ -118,6 +118,7 @@ export class DungeonScene implements GameScene {
   // ═══════════════════════════════════════════
 
   async onLoad(): Promise<void> {
+    console.log(`[DUNGEON] onLoad basliyor — rank: ${this.rank}`);
     // Onceki calismanin kalintilarini temizle (tekrar giriste)
     this.cleanupPreviousRun();
 
@@ -136,6 +137,7 @@ export class DungeonScene implements GameScene {
     this.shadowSelection.setEnemies(this.enemies);
 
     eventBus.emit('dungeon:enter', { rank: this.rank });
+    console.log(`[DUNGEON] onLoad tamamlandi — ${this.enemies.length} dusman spawn edildi`);
   }
 
   /**
