@@ -612,10 +612,10 @@ export class TestScene implements GameScene {
       dungeonScene.setRank(rank);
     }
 
-    this.game.sceneManager.switchTo('dungeon').catch((err: unknown) => {
-      if (err instanceof Error) {
-        throw new Error(`Dungeon entry failed: ${err.message}`);
-      }
+    this.game.sceneManager.switchTo('dungeon').then(() => {
+      console.log('[SCENE] Dungeon sahnesine basariyla gecildi');
+    }).catch((err: unknown) => {
+      console.error('[SCENE] Dungeon giris hatasi:', err);
     });
   }
 
