@@ -188,7 +188,10 @@ export class DungeonScene implements GameScene {
     this.enemies.forEach(e => e.dispose());
     this.enemies = [];
 
-    // Eski portallari temizle
+    // Eski portallari temizle (meshes[] icinde olsalar bile acikca temizle)
+    if (this.exitPortal) {
+      this.exitPortal.dispose();
+    }
     if (this.victoryPortal) {
       this.victoryPortal.dispose();
       this.victoryPortal = null;
@@ -207,6 +210,9 @@ export class DungeonScene implements GameScene {
     this.shadowArmy?.dispose();
     this.shadowSelection?.dispose();
     this.shadowUI?.dispose();
+    this.shadowManageUI?.dispose();
+    this.shadowStockPicker?.dispose();
+    disposeDevConsole();
 
     // Boss state sifirla
     this.bossSpawnTimer = -1;
@@ -387,7 +393,10 @@ export class DungeonScene implements GameScene {
     this.shadowArmy?.dispose();
     this.shadowSelection?.dispose();
     this.shadowUI?.dispose();
+    this.shadowManageUI?.dispose();
+    this.shadowStockPicker?.dispose();
     if (this.victoryPortal) this.victoryPortal.dispose();
+    disposeDevConsole();
   }
 
   // ═══════════════════════════════════════════

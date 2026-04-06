@@ -147,18 +147,21 @@ export class DungeonManager {
     };
   }
 
-  /** Dungeon ici olum cezasi — XP ve item kaybi */
+  /** Dungeon ici olum cezasi — XP ve item kaybi (immutable pattern) */
   applyDeathPenalty(): { xpLost: number; itemsLost: string[] } {
     const xpLost = Math.round(this.dungeonXp * DUNGEON.deathPenalty.xpLossPercent);
     this.dungeonXp = Math.max(0, this.dungeonXp - xpLost);
 
     const itemsLost: string[] = [];
-    // Sondan basa iterasyon — splice guvenli
-    for (let i = this.dungeonItems.length - 1; i >= 0; i--) {
+    const kept: string[] = [];
+    for (const item of this.dungeonItems) {
       if (Math.random() < DUNGEON.deathPenalty.itemLossChance) {
-        itemsLost.push(...this.dungeonItems.splice(i, 1));
+        itemsLost.push(item);
+      } else {
+        kept.push(item);
       }
     }
+    this.dungeonItems = kept;
 
     return { xpLost, itemsLost };
   }
