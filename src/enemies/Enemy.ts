@@ -17,7 +17,13 @@ export interface EnemyDef {
   name: string;
   hp: number;
   damage: number;
-  defense?: number;        // savunma — gelen hasardan dusulur
+  defense?: number;           // savunma — gelen hasardan dusulur
+  attackSpeed?: number;       // saldiri cooldown (sn) — dusuk = hizli
+  moveSpeed?: number;         // kovalama hizi (birim/sn)
+  attackRange?: number;       // saldiri menzili
+  detectionRange?: number;    // algilama mesafesi
+  patrolSpeed?: number;       // dolasma hizi
+  patrolRadius?: number;      // dolasma alani
   xpReward: number;
   goldReward: number;
   color: Color3;

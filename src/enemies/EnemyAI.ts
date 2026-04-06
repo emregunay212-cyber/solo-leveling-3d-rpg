@@ -19,21 +19,21 @@ export enum AIState {
 export class EnemyAI {
   public state = AIState.IDLE;
 
-  // Detection
-  private readonly DETECTION_RANGE = ENEMY_AI.detectionRange;
-  private readonly ATTACK_RANGE = ENEMY_AI.attackRange;
-  private leashRange: number = ENEMY_AI.leashRange; // max distance from spawn before returning
-  private readonly CHASE_SPEED = ENEMY_AI.chaseSpeed;
-  private readonly PATROL_SPEED = ENEMY_AI.patrolSpeed;
+  // Detection — EnemyDef'ten okunur, yoksa global default
+  private readonly DETECTION_RANGE: number;
+  private readonly ATTACK_RANGE: number;
+  private leashRange: number;
+  private readonly CHASE_SPEED: number;
+  private readonly PATROL_SPEED: number;
 
   // Attack
-  private readonly ATTACK_COOLDOWN = ENEMY_AI.attackCooldown; // slower attacks
+  private readonly ATTACK_COOLDOWN: number;
   private attackTimer = 0;
 
   // Patrol
   private patrolTarget: Vector3 | null = null;
   private patrolWaitTimer = 0;
-  private readonly PATROL_RADIUS = ENEMY_AI.patrolRadius;
+  private readonly PATROL_RADIUS: number;
   private readonly PATROL_WAIT_MIN = ENEMY_AI.patrolWaitMin;
   private readonly PATROL_WAIT_MAX = ENEMY_AI.patrolWaitMax;
 
@@ -46,6 +46,16 @@ export class EnemyAI {
 
   constructor(enemy: Enemy, spawnPos: Vector3) {
     this.enemy = enemy;
+
+    // Davranis parametreleri: EnemyDef'te tanimli ise onu kullan, yoksa global default
+    const def = enemy.def;
+    this.DETECTION_RANGE = def.detectionRange ?? ENEMY_AI.detectionRange;
+    this.ATTACK_RANGE = def.attackRange ?? ENEMY_AI.attackRange;
+    this.leashRange = ENEMY_AI.leashRange;
+    this.CHASE_SPEED = def.moveSpeed ?? ENEMY_AI.chaseSpeed;
+    this.PATROL_SPEED = def.patrolSpeed ?? ENEMY_AI.patrolSpeed;
+    this.ATTACK_COOLDOWN = def.attackSpeed ?? ENEMY_AI.attackCooldown;
+    this.PATROL_RADIUS = def.patrolRadius ?? ENEMY_AI.patrolRadius;
     this.spawnPos = spawnPos.clone();
     this.idleTimer = Math.random() * 3; // stagger initial patrol
   }

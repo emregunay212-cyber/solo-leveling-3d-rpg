@@ -30,6 +30,10 @@ export const DUNGEON_BOSS_DEFS: Record<string, EnemyDef> = {
     hp: 400,
     damage: 12,
     defense: 5,
+    attackSpeed: 0.8,        // cok hizli vuruyor
+    moveSpeed: 5.0,          // cok hizli
+    attackRange: 2.5,
+    detectionRange: 12,
     xpReward: 300,
     goldReward: 100,
     color: new Color3(0.15, 0.55, 0.1),
@@ -44,6 +48,10 @@ export const DUNGEON_BOSS_DEFS: Record<string, EnemyDef> = {
     hp: 800,
     damage: 20,
     defense: 10,
+    attackSpeed: 2.0,        // yavas ama olumcul
+    moveSpeed: 2.0,          // cok yavas
+    attackRange: 4.0,        // uzun menzil
+    detectionRange: 14,
     xpReward: 600,
     goldReward: 200,
     color: new Color3(0.85, 0.82, 0.75),
@@ -58,6 +66,10 @@ export const DUNGEON_BOSS_DEFS: Record<string, EnemyDef> = {
     hp: 1500,
     damage: 35,
     defense: 20,
+    attackSpeed: 3.0,        // en yavas — yikici darbeler
+    moveSpeed: 2.5,          // agir tank
+    attackRange: 2.5,
+    detectionRange: 10,
     xpReward: 1200,
     goldReward: 500,
     color: new Color3(0.15, 0.35, 0.1),
@@ -72,6 +84,10 @@ export const DUNGEON_BOSS_DEFS: Record<string, EnemyDef> = {
     hp: 3000,
     damage: 50,
     defense: 30,
+    attackSpeed: 1.0,        // hizli buyucu
+    moveSpeed: 3.0,
+    attackRange: 5.0,        // uzun menzil — buyu
+    detectionRange: 16,      // genis algilama
     xpReward: 3000,
     goldReward: 1200,
     color: new Color3(0.3, 0.1, 0.4),
@@ -86,6 +102,10 @@ export const DUNGEON_BOSS_DEFS: Record<string, EnemyDef> = {
     hp: 6000,
     damage: 80,
     defense: 50,
+    attackSpeed: 1.2,        // hizli
+    moveSpeed: 4.5,          // hizli
+    attackRange: 4.5,        // genis menzil
+    detectionRange: 18,
     xpReward: 6000,
     goldReward: 3000,
     color: new Color3(0.7, 0.05, 0.05),
@@ -100,6 +120,10 @@ export const DUNGEON_BOSS_DEFS: Record<string, EnemyDef> = {
     hp: 15000,
     damage: 150,
     defense: 80,
+    attackSpeed: 0.8,        // en hizli boss
+    moveSpeed: 5.5,          // en hizli boss
+    attackRange: 5.0,        // en genis menzil
+    detectionRange: 20,      // tum arena
     xpReward: 15000,
     goldReward: 10000,
     color: new Color3(0.05, 0.02, 0.08),
