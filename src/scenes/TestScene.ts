@@ -161,6 +161,9 @@ export class TestScene implements GameScene {
     this.game.playerCombat.setBaseDamage(this.levelSystem.getAttackDamage());
 
     this.respawnManager = new RespawnManager();
+    this.respawnManager.setOnRespawn((enemy) => {
+      this.game.combatSystem.registerTarget(enemy);
+    });
     this.damageCalculator = new DamageCalculator(this.levelSystem, this.game.damageNumbers);
 
     // Skill system

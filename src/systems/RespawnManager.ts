@@ -14,6 +14,12 @@ interface RespawnEntry {
  */
 export class RespawnManager {
   private timers: RespawnEntry[] = [];
+  private onRespawnCb: ((enemy: Enemy) => void) | null = null;
+
+  /** Respawn oldugunda cagrilacak callback (ornegin combatSystem.registerTarget) */
+  public setOnRespawn(cb: (enemy: Enemy) => void): void {
+    this.onRespawnCb = cb;
+  }
 
   /**
    * Olen dusmani respawn kuyruğuna ekle.
@@ -35,6 +41,7 @@ export class RespawnManager {
       if (this.timers[i].timer <= 0) {
         const { enemy, pos } = this.timers[i];
         enemy.respawn(pos);
+        if (this.onRespawnCb) this.onRespawnCb(enemy);
         this.timers.splice(i, 1);
       }
     }
