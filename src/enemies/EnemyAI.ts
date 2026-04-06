@@ -207,14 +207,13 @@ export class EnemyAI {
         this.enemy.onAttackThreatTarget(this.enemy.def.damage);
         this.attackTimer = this.ATTACK_COOLDOWN;
       } else if (playerAlive) {
-        // Oyuncuya saldir (yon kontrolu ile)
+        // Oyuncuya saldir
+        // Zaten faceDirection ile hedefe donuldugu icin, saldiri menzilindeyse
+        // dogrudan saldir. Cok yakin mesafede isFacing yanlis sonuc veriyor.
         const playerPos = this.lastPlayerPos;
-        const facing = CombatSystem.isFacing(
-          this.enemy.position,
-          this.enemy.getRotationY(),
-          playerPos,
-        );
-        if (facing) {
+        const canAttack = distToTarget < this.ATTACK_RANGE * 0.8
+          || CombatSystem.isFacing(this.enemy.position, this.enemy.getRotationY(), playerPos);
+        if (canAttack) {
           const isBackstab = CombatSystem.isTargetBehind(
             this.enemy.position,
             playerPos,

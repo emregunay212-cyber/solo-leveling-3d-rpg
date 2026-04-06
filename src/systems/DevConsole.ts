@@ -43,6 +43,7 @@ interface DevWindow {
   stats: () => void;
   setStat: (stat: string, value: number) => void;
   addStatPoints: (amount: number) => void;
+  setDamage: (dmg: number) => void;
   tp: (x: number, y: number, z: number) => void;
   dungeon: (rank: string) => void;
   _devConsoleCleanup?: () => void;
@@ -126,6 +127,11 @@ export function initDevConsole(deps: DevDeps): void {
     console.log(`[DEV] +${amount} stat puani → Toplam: ${deps.levelSystem.statPoints}`);
   };
 
+  w.setDamage = (dmg: number) => {
+    deps.combat.setBaseDamage(dmg);
+    console.log(`[DEV] Saldiri hasari → ${dmg} (gecici — faz sonunda kaldirilacak)`);
+  };
+
   w.tp = (x: number, y: number, z: number) => {
     if (deps.teleportTo) {
       deps.teleportTo(x, y, z);
@@ -154,6 +160,7 @@ export function initDevConsole(deps: DevDeps): void {
     delete (w as Partial<DevWindow>).stats;
     delete (w as Partial<DevWindow>).setStat;
     delete (w as Partial<DevWindow>).addStatPoints;
+    delete (w as Partial<DevWindow>).setDamage;
     delete (w as Partial<DevWindow>).tp;
     delete (w as Partial<DevWindow>).dungeon;
     delete (w as Partial<DevWindow>)._devConsoleCleanup;
