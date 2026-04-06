@@ -12,7 +12,8 @@ import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
 import type { EnemyDef } from '../enemies/Enemy';
 import { PLAYER_SKILL_BOOK_DEFS, ENEMY_SKILL_DEFS, BOOK_TO_SKILL_MAP, SKILL_KEY_LABELS } from '../data/shadowSkillBooks';
 import { SHADOW_ENHANCEMENT } from '../config/GameConfig';
-import { calculateShadowStats } from '../shadows/ShadowStatCalculator';
+import { calculateShadowStats, calculateShadowStatsBreakdown } from '../shadows/ShadowStatCalculator';
+import type { StatBreakdown } from '../shadows/ShadowStatCalculator';
 
 type TabId = 'detail' | 'shop' | 'books';
 
@@ -341,6 +342,7 @@ export class ShadowManageUI {
 
     const enemyDef = this.getEnemyDef(profile.enemyDefId);
     const stats = enemyDef ? calculateShadowStats(enemyDef, profile, this.playerStats) : null;
+    const breakdown = enemyDef ? calculateShadowStatsBreakdown(enemyDef, profile, this.playerStats) : null;
     const rc = RANK_COLORS[profile.rank] ?? '#aaa';
     const rankName = SHADOW_ENHANCEMENT.ranks.find(r => r.rank === profile.rank)?.name ?? profile.rank;
     const typeLabel = profile.isBoss ? 'BOSS' : 'Normal';
@@ -361,12 +363,19 @@ export class ShadowManageUI {
       <div class="smu-stat-row"><span>Oldurmeler</span><span class="smu-stat-val">${profile.kills}</span></div>
       <div class="smu-stat-row"><span>HP</span><span class="smu-stat-val">${Math.round(profile.hpPercent * 100)}%</span></div>`;
 
-    if (stats) {
-      html += `
-      <div class="smu-stat-row"><span>Maks HP</span><span class="smu-stat-val">${stats.maxHp}</span></div>
-      <div class="smu-stat-row"><span>Hasar</span><span class="smu-stat-val">${stats.damage}</span></div>
-      <div class="smu-stat-row"><span>Savunma</span><span class="smu-stat-val">${stats.defense}</span></div>
-      <div class="smu-stat-row"><span>Saldiri Hizi</span><span class="smu-stat-val">${stats.attackCooldown.toFixed(2)}s</span></div>`;
+    if (breakdown) {
+      const bk = (label: string, bd: StatBreakdown): string => {
+        const parts: string[] = [];
+        if (bd.base > 0) parts.push(`<span style="color:#aaa">${bd.base}</span>`);
+        if (bd.player > 0) parts.push(`<span style="color:#4ade80">+${bd.player}</span>`);
+        if (bd.rank > 0) parts.push(`<span style="color:#f59e0b">+${bd.rank}</span>`);
+        const detail = parts.length > 1 ? ` (${parts.join(' ')})` : '';
+        return `<div class="smu-stat-row"><span>${label}</span><span class="smu-stat-val"><span style="color:#e0d4fc;font-weight:700">${bd.total}</span>${detail}</span></div>`;
+      };
+      html += bk('Maks HP', breakdown.maxHp);
+      html += bk('Hasar', breakdown.damage);
+      html += bk('Savunma', breakdown.defense);
+      html += `<div class="smu-stat-row"><span>Saldiri Hizi</span><span class="smu-stat-val">${breakdown.attackCooldown.toFixed(2)}s</span></div>`;
     }
     html += '</div>';
 
