@@ -42,6 +42,7 @@ import { ShadowInventory } from '../systems/ShadowInventory';
 import { DropSystem } from '../systems/DropSystem';
 import { DungeonManager } from '../dungeon/DungeonManager';
 import { ShadowStockPicker } from '../ui/ShadowStockPicker';
+import { initDevConsole, disposeDevConsole } from '../systems/DevConsole';
 import type { DungeonRank } from '../dungeon/types';
 import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
 
@@ -332,6 +333,7 @@ export class DungeonScene implements GameScene {
     if (this.exitPortal) { this.exitPortal.dispose(); }
     if (this.victoryPortal) { this.victoryPortal.dispose(); this.victoryPortal = null; }
     this.shadowStockPicker?.dispose();
+    disposeDevConsole();
   }
 
   onDispose(): void {
@@ -543,6 +545,18 @@ export class DungeonScene implements GameScene {
       this.game.player.setAutoMoveTarget(worldPos);
       this.game.playerCombat.cancelAutoAttack();
       this.clickIndicator.spawn(worldPos);
+    });
+
+    // Dev console — dungeon icinde de calissin
+    initDevConsole({
+      levelSystem: this.levelSystem,
+      player: this.game.player,
+      combat: this.game.playerCombat,
+      getEnemies: () => this.enemies,
+      getHp: () => this.playerHp,
+      getMp: () => this.playerMp,
+      setHp: (v) => { this.playerHp = v; },
+      setMp: (v) => { this.playerMp = v; },
     });
   }
 
