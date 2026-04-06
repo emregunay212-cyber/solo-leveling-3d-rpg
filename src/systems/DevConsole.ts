@@ -29,6 +29,7 @@ interface DevDeps {
   readonly getMp: () => number;
   readonly setHp: (v: number) => void;
   readonly setMp: (v: number) => void;
+  readonly applyStats?: () => void;
   readonly teleportTo?: (x: number, y: number, z: number) => void;
   readonly enterDungeon?: (rank: string) => void;
 }
@@ -114,9 +115,10 @@ export function initDevConsole(deps: DevDeps): void {
       return;
     }
     (deps.levelSystem as unknown as Record<string, number>)[s] = value;
+    if (deps.applyStats) deps.applyStats();
     deps.setHp(deps.levelSystem.getMaxHp());
     deps.setMp(deps.levelSystem.getMaxMp());
-    console.log(`[DEV] ${s.toUpperCase()} → ${value} | HP ${deps.levelSystem.getMaxHp()} | MP ${deps.levelSystem.getMaxMp()}`);
+    console.log(`[DEV] ${s.toUpperCase()} → ${value} | Saldiri ${deps.levelSystem.getAttackDamage()} | HP ${deps.levelSystem.getMaxHp()} | MP ${deps.levelSystem.getMaxMp()}`);
   };
 
   w.addStatPoints = (amount: number) => {

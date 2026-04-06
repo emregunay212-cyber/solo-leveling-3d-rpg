@@ -623,6 +623,7 @@ export class DungeonScene implements GameScene {
       getMp: () => this.playerMp,
       setHp: (v) => { this.playerHp = v; },
       setMp: (v) => { this.playerMp = v; },
+      applyStats: () => { this.applyStats(); this.updateHUD(); },
     });
   }
 
