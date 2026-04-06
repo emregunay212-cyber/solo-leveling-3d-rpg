@@ -103,6 +103,7 @@ export class DungeonScene implements GameScene {
   // Boss spawn zamanlayici
   private bossSpawnTimer = -1;
   private bossSpawned = false;
+  private entryGracePeriod = 2; // ilk 2sn portal tetiklenmez
 
   constructor(game: Game) {
     this.game = game;
@@ -136,6 +137,7 @@ export class DungeonScene implements GameScene {
     this.createExitPortal(scene);
     this.shadowSelection.setEnemies(this.enemies);
 
+    this.entryGracePeriod = 2; // portal korumasi resetle
     eventBus.emit('dungeon:enter', { rank: this.rank });
     console.log(`[DUNGEON] onLoad tamamlandi — ${this.enemies.length} dusman spawn edildi`);
   }
@@ -268,7 +270,7 @@ export class DungeonScene implements GameScene {
     this.updatePortals(dt);
 
     // Portal yakinlik kontrolu
-    this.checkPortalProximity();
+    this.checkPortalProximity(dt);
 
     this.updateComboIndicator();
     this.game.hud.setBlocking(ctx.player.isBlocking);
@@ -425,9 +427,9 @@ export class DungeonScene implements GameScene {
     this.game.player.setCamera(this.game.playerCamera);
     scene.activeCamera = this.game.playerCamera.camera;
 
-    // Dungeon giriside oyuncuyu guney duvara yakin spawnla
+    // Dungeon girisinde oyuncuyu arena merkezine yakin spawnla (cikis portalindan uzak)
     const arenaSize = DUNGEON.arenaSize[this.rank];
-    const spawnZ = -(arenaSize / 2 - 4);
+    const spawnZ = -(arenaSize / 4); // Merkezin biraz guneyi
     this.game.player.mesh.position.set(0, 0.9, spawnZ);
     this.game.player.characterController.setPosition(new Vector3(0, 0.9, spawnZ));
   }
@@ -670,7 +672,7 @@ export class DungeonScene implements GameScene {
 
   private createExitPortal(scene: Scene): void {
     const arenaSize = DUNGEON.arenaSize[this.rank];
-    const portalZ = -(arenaSize / 2 - 3);
+    const portalZ = -(arenaSize / 2 - 1); // Duvara yakin, oyuncu spawn'indan uzak
 
     this.exitPortal = MeshBuilder.CreateTorus('exitPortal', {
       diameter: 3, thickness: 0.2, tessellation: 32,
@@ -710,9 +712,15 @@ export class DungeonScene implements GameScene {
     }
   }
 
-  private checkPortalProximity(): void {
+  private checkPortalProximity(dt: number): void {
     if (!this.playerAlive) return;
     const playerPos = this.game.player.getPosition();
+
+    // Grace period: dungeon'a girdikten sonra 2sn portal tetiklenmez
+    if (this.entryGracePeriod > 0) {
+      this.entryGracePeriod -= dt;
+      return;
+    }
 
     // Cikis portali — her zaman aktif
     if (this.exitPortal) {
