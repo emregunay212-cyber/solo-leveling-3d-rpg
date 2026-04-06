@@ -143,7 +143,8 @@ export class TestScene implements GameScene {
   }
 
   private initProgression(): void {
-    this.levelSystem = new LevelSystem();
+    // Paylasilan state: dungeon'dan donuste mevcut verileri koru
+    this.levelSystem = this.game.levelSystem ?? new LevelSystem();
     this.levelSystem.setOnLevelUp(() => {
       this.applyStats();
       this.playerHp = this.playerMaxHp;
@@ -160,7 +161,6 @@ export class TestScene implements GameScene {
 
     this.respawnManager = new RespawnManager();
     this.damageCalculator = new DamageCalculator(this.levelSystem, this.game.damageNumbers);
-    // Shield buff baglantisi — initProgression'da skillSystem henuz yok, sonra baglanacak
 
     // Skill system
     this.skillEffects = new SkillEffects(this.game.engine.scene);
@@ -172,9 +172,9 @@ export class TestScene implements GameScene {
     // Shield buff → DamageCalculator baglantisi
     this.damageCalculator.setShieldReductionGetter(() => this.skillSystem.getShieldReduction());
 
-    // Shadow profile & inventory systems
-    this.shadowProfileManager = new ShadowProfileManager();
-    this.shadowInventory = new ShadowInventory();
+    // Shadow profile & inventory — dungeon'dan donuste mevcut verileri koru
+    this.shadowProfileManager = this.game.shadowProfileManager ?? new ShadowProfileManager();
+    this.shadowInventory = this.game.shadowInventory ?? new ShadowInventory();
     this.dropSystem = new DropSystem(this.shadowInventory);
 
     // Shadow army + selection (pass playerStats and profileManager)
@@ -183,20 +183,27 @@ export class TestScene implements GameScene {
     this.shadowSelection = new ShadowSelection(this.game.engine.scene, this.shadowArmy, this.game.input);
     this.shadowSelection.setDamageNumbers(this.game.damageNumbers);
 
-    // Dungeon cooldown tracker
-    this.cooldownTracker = new DungeonCooldownTracker();
+    // Dungeon cooldown tracker — persist across scenes
+    if (!this.cooldownTracker) {
+      this.cooldownTracker = new DungeonCooldownTracker();
+    }
 
-    // Player rank system — baslangic yeteneklerini ekle
-    this.playerRankSystem = new PlayerRankSystem();
-    const startingSkills = Object.values(SKILLS).map(s => ({
-      id: s.id,
-      name: s.name,
-      rank: s.rank as import('../dungeon/types').PlayerRank,
-      power: s.power,
-      key: s.key,
-      type: s.type,
-    }));
-    this.playerRankSystem.initializeStartingSkills(startingSkills);
+    // Player rank system — persist across scenes
+    if (!this.playerRankSystem) {
+      this.playerRankSystem = new PlayerRankSystem();
+      const startingSkills = Object.values(SKILLS).map(s => ({
+        id: s.id,
+        name: s.name,
+        rank: s.rank as import('../dungeon/types').PlayerRank,
+        power: s.power,
+        key: s.key,
+        type: s.type,
+      }));
+      this.playerRankSystem.initializeStartingSkills(startingSkills);
+    }
+
+    // Dungeon'dan donuste gold'u geri al
+    this.gold = this.game.gold;
 
     // Paylasilan state'i Game nesnesine aktar
     this.game.levelSystem = this.levelSystem;
@@ -604,6 +611,7 @@ export class TestScene implements GameScene {
     this.game.levelSystem = this.levelSystem;
     this.game.shadowProfileManager = this.shadowProfileManager;
     this.game.shadowInventory = this.shadowInventory;
+    this.game.gold = this.gold;
     this.game.dungeonRank = rank;
 
     // DungeonScene'e rank aktar ve sahne degistir

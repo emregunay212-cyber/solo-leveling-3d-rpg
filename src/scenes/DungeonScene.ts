@@ -305,6 +305,7 @@ export class DungeonScene implements GameScene {
     this.game.levelSystem = this.levelSystem;
     this.game.shadowProfileManager = this.shadowProfileManager;
     this.game.shadowInventory = this.shadowInventory;
+    this.game.gold = this.gold;
 
     // Tum kaynaklari temizle (geri donuste onLoad tekrar olusturur)
     if (this.keyHandler) {
@@ -474,6 +475,7 @@ export class DungeonScene implements GameScene {
     this.playerHp = this.playerMaxHp;
     this.playerMaxMp = this.levelSystem.getMaxMp();
     this.playerMp = this.playerMaxMp;
+    this.gold = this.game.gold;
     this.game.playerCombat.setBaseDamage(this.levelSystem.getAttackDamage());
 
     this.damageCalculator = new DamageCalculator(this.levelSystem, this.game.damageNumbers);

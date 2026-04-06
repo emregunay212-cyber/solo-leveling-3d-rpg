@@ -32,6 +32,7 @@ export class Game {
   public shadowProfileManager?: ShadowProfileManager;
   public shadowInventory?: ShadowInventory;
   public dungeonRank?: DungeonRank;
+  public gold = 0;
 
   constructor() {
     this.engine = new Engine('gameCanvas');
