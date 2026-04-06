@@ -603,6 +603,12 @@ export class DungeonScene implements GameScene {
       }
     }
 
+    // Dungeon dusmanlarinin leash range'ini arena boyutuna ayarla
+    const arenaLeash = arenaSize * 0.8;
+    for (const enemy of this.enemies) {
+      enemy.ai.setLeashRange(arenaLeash);
+    }
+
     this.dungeonManager.registerEnemies(this.enemies);
   }
 
@@ -673,6 +679,8 @@ export class DungeonScene implements GameScene {
 
     // Boss gorusel farkliligi: daha buyuk
     boss.mesh.scaling.scaleInPlace(1.3);
+    // Boss asla spawn noktasina donmez — tum arena boyunca kovalar
+    boss.ai.setLeashRange(9999);
 
     this.game.combatSystem.registerTarget(boss);
 

@@ -22,7 +22,7 @@ export class EnemyAI {
   // Detection
   private readonly DETECTION_RANGE = ENEMY_AI.detectionRange;
   private readonly ATTACK_RANGE = ENEMY_AI.attackRange;
-  private readonly LEASH_RANGE = ENEMY_AI.leashRange; // max distance from spawn before returning
+  private leashRange: number = ENEMY_AI.leashRange; // max distance from spawn before returning
   private readonly CHASE_SPEED = ENEMY_AI.chaseSpeed;
   private readonly PATROL_SPEED = ENEMY_AI.patrolSpeed;
 
@@ -149,14 +149,14 @@ export class EnemyAI {
 
   private updateChase(dt: number, toPlayer: Vector3, distToPlayer: number, distToSpawn: number, playerAlive: boolean): void {
     // Leash check - too far from spawn, go back
-    if (distToSpawn > this.LEASH_RANGE) {
+    if (distToSpawn > this.leashRange) {
       this.state = AIState.RETURN;
       this.enemy.velocity.setAll(0);
       return;
     }
 
     // Player dead or too far
-    if (!playerAlive || distToPlayer > this.LEASH_RANGE) {
+    if (!playerAlive || distToPlayer > this.leashRange) {
       this.state = AIState.RETURN;
       this.enemy.velocity.setAll(0);
       return;
@@ -250,6 +250,9 @@ export class EnemyAI {
       this.spawnPos.z + Math.sin(angle) * dist
     );
   }
+
+  /** Leash mesafesini degistir (boss icin cok yuksek yap) */
+  public setLeashRange(range: number): void { this.leashRange = range; }
 
   public onDeath(): void {
     this.state = AIState.DEAD;
