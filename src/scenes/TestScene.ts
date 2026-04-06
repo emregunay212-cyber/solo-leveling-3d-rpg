@@ -56,6 +56,8 @@ export class TestScene implements GameScene {
 
   // Systems
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private shadowControlHandler: ((e: PointerEvent) => void) | null = null;
+  private soulStockHandler: ((e: PointerEvent) => void) | null = null;
   private clickIndicator!: ClickIndicator;
   private levelSystem!: LevelSystem;
   private deathScreen!: DeathScreen;
@@ -418,7 +420,7 @@ export class TestScene implements GameScene {
     const canvas = scene.getEngine().getRenderingCanvas()!;
 
     // 1-4 basili tutarken golgeye tiklama → stokla
-    canvas.addEventListener('pointerdown', (e) => {
+    this.soulStockHandler = (e: PointerEvent) => {
       if (e.button !== 0 || e.altKey) return;
 
       // Hangi stok tusu basili?
@@ -451,7 +453,8 @@ export class TestScene implements GameScene {
           0, 'skill',
         );
       }
-    });
+    };
+    canvas.addEventListener('pointerdown', this.soulStockHandler);
   }
 
   /** Alt + 1/2/3/4 kontrol (onUpdate icinden cagrilir) */
@@ -647,7 +650,7 @@ export class TestScene implements GameScene {
   private setupShadowControls(scene: Scene): void {
     const canvas = scene.getEngine().getRenderingCanvas()!;
 
-    canvas.addEventListener('pointerdown', (e) => {
+    this.shadowControlHandler = (e: PointerEvent) => {
       if (!e.altKey) return;
       e.preventDefault();
 
@@ -656,7 +659,8 @@ export class TestScene implements GameScene {
       } else if (e.button === 2) {
         this.handleAltRightClick(scene);
       }
-    });
+    };
+    canvas.addEventListener('pointerdown', this.shadowControlHandler);
   }
 
   /** Alt + sol tik: olu cesede → cikar, canli dusmana → golgeleri yonlendir */
@@ -960,6 +964,18 @@ export class TestScene implements GameScene {
     if (this.keyHandler) {
       window.removeEventListener('keydown', this.keyHandler);
       this.keyHandler = null;
+    }
+    // Canvas pointer listener'larini temizle (leak onleme)
+    const canvas = this.game.engine.scene.getEngine().getRenderingCanvas();
+    if (canvas) {
+      if (this.shadowControlHandler) {
+        canvas.removeEventListener('pointerdown', this.shadowControlHandler);
+        this.shadowControlHandler = null;
+      }
+      if (this.soulStockHandler) {
+        canvas.removeEventListener('pointerdown', this.soulStockHandler);
+        this.soulStockHandler = null;
+      }
     }
     this.meshes.forEach(m => m.dispose());
     this.meshes = [];

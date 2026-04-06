@@ -86,18 +86,29 @@ export function calculateShadowStatsBreakdown(
   const baseDmg = Math.round(enemyDef.damage * 0.5);
   const baseDef = 0;
 
-  // Oyuncu stat kopyası (base pct ile)
-  const playerHp = Math.max(20, Math.round(playerStats.maxHp * basePct));
-  const playerDmg = Math.max(1, Math.round(playerStats.attackDamage * basePct));
-  const playerDef = Math.round(playerStats.defense * basePct);
+  // calculateShadowStats ile tutarli hesaplama:
+  // Tam rankPct ile hesaplanmis deger (calculateShadowStats ciktisi)
+  const fullHp = Math.max(20, Math.round(playerStats.maxHp * rankPct));
+  const fullDmg = Math.max(1, Math.round(playerStats.attackDamage * rankPct));
+  const fullDef = Math.round(playerStats.defense * rankPct);
 
-  // Rank bonusu (sadece boss, ekstra yuzde farki)
-  const rankHp = isBoss ? Math.round(playerStats.maxHp * rankBonus) : 0;
-  const rankDmg = isBoss ? Math.round(playerStats.attackDamage * rankBonus) : 0;
-  const rankDef = isBoss ? Math.round(playerStats.defense * rankBonus) : 0;
+  // basePct ile hesaplanmis deger (rank olmadan)
+  const baseOnlyHp = Math.max(20, Math.round(playerStats.maxHp * basePct));
+  const baseOnlyDmg = Math.max(1, Math.round(playerStats.attackDamage * basePct));
+  const baseOnlyDef = Math.round(playerStats.defense * basePct);
 
-  const totalHp = Math.max(baseHp, playerHp) + rankHp;
-  const totalDmg = Math.max(baseDmg, playerDmg) + rankDmg;
+  // Rank bonusu: tam deger ile base-only farki
+  const rankHp = isBoss ? fullHp - baseOnlyHp : 0;
+  const rankDmg = isBoss ? fullDmg - baseOnlyDmg : 0;
+  const rankDef = isBoss ? fullDef - baseOnlyDef : 0;
+
+  // Oyuncu stat kopyasi olarak base-only degerleri kullan
+  const playerHp = baseOnlyHp;
+  const playerDmg = baseOnlyDmg;
+  const playerDef = baseOnlyDef;
+
+  const totalHp = Math.max(Math.max(playerHp, baseHp) + rankHp, baseHp);
+  const totalDmg = Math.max(Math.max(playerDmg, baseDmg) + rankDmg, baseDmg);
   const totalDef = playerDef + rankDef;
 
   const attackCooldown: number = Math.max(0.5, 2.0 / (1 + playerStats.attackSpeed * rankPct * 0.3));

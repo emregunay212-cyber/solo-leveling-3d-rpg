@@ -89,6 +89,8 @@ export class DungeonScene implements GameScene {
 
   // Systems (scene-local)
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private shadowControlHandler: ((e: PointerEvent) => void) | null = null;
+  private soulStockHandler: ((e: PointerEvent) => void) | null = null;
   private clickIndicator!: ClickIndicator;
   private levelSystem!: LevelSystem;
   private deathScreen!: DeathScreen;
@@ -162,6 +164,18 @@ export class DungeonScene implements GameScene {
     if (this.keyHandler) {
       window.removeEventListener('keydown', this.keyHandler);
       this.keyHandler = null;
+    }
+    // Eski canvas pointer listener'larini kaldir
+    const canvas = this.game.engine.scene.getEngine().getRenderingCanvas();
+    if (canvas) {
+      if (this.shadowControlHandler) {
+        canvas.removeEventListener('pointerdown', this.shadowControlHandler);
+        this.shadowControlHandler = null;
+      }
+      if (this.soulStockHandler) {
+        canvas.removeEventListener('pointerdown', this.soulStockHandler);
+        this.soulStockHandler = null;
+      }
     }
 
     // Eski mesh ve fizik nesnelerini temizle
@@ -315,6 +329,18 @@ export class DungeonScene implements GameScene {
     if (this.keyHandler) {
       window.removeEventListener('keydown', this.keyHandler);
       this.keyHandler = null;
+    }
+    // Canvas pointer listener'larini temizle (leak onleme)
+    const canvas = this.game.engine.scene.getEngine().getRenderingCanvas();
+    if (canvas) {
+      if (this.shadowControlHandler) {
+        canvas.removeEventListener('pointerdown', this.shadowControlHandler);
+        this.shadowControlHandler = null;
+      }
+      if (this.soulStockHandler) {
+        canvas.removeEventListener('pointerdown', this.soulStockHandler);
+        this.soulStockHandler = null;
+      }
     }
     this.meshes.forEach(m => m.dispose());
     this.meshes = [];
@@ -544,6 +570,16 @@ export class DungeonScene implements GameScene {
       this.shadowInventory,
       (name: string) => ENEMY_DEFS[name] ?? DUNGEON_BOSS_DEFS[name] ?? null,
     );
+
+    // Soul slot click opens manage UI with that slot's shadow selected
+    this.shadowUI.setOnSlotClick((slotIndex: number) => {
+      const slots = this.shadowArmy.getSoulSlots();
+      const slot = slots[slotIndex];
+      if (slot && slot.profiles.length > 0) {
+        this.shadowManageUI.selectShadow(slot.profiles[0].uid);
+        this.shadowManageUI.open();
+      }
+    });
 
     // Tab = golge yonetim, P = stat dagitim (dungeon icinde degistirilemez ama gorulebilir), G = mod
     this.keyHandler = (e: KeyboardEvent): void => {
@@ -865,7 +901,7 @@ export class DungeonScene implements GameScene {
   private setupShadowControls(scene: Scene): void {
     const canvas = scene.getEngine().getRenderingCanvas()!;
 
-    canvas.addEventListener('pointerdown', (e) => {
+    this.shadowControlHandler = (e: PointerEvent) => {
       if (!e.altKey) return;
       e.preventDefault();
 
@@ -874,7 +910,8 @@ export class DungeonScene implements GameScene {
       } else if (e.button === 2) {
         this.handleAltRightClick(scene);
       }
-    });
+    };
+    canvas.addEventListener('pointerdown', this.shadowControlHandler);
   }
 
   private handleAltLeftClick(scene: Scene): void {
@@ -952,7 +989,7 @@ export class DungeonScene implements GameScene {
 
   private setupSoulStockControls(scene: Scene): void {
     const canvas = scene.getEngine().getRenderingCanvas()!;
-    canvas.addEventListener('pointerdown', (e) => {
+    this.soulStockHandler = (e: PointerEvent) => {
       if (e.button !== 0 || e.altKey) return;
       let slotIndex = -1;
       for (let i = 0; i < 4; i++) {
@@ -967,7 +1004,8 @@ export class DungeonScene implements GameScene {
       if (success) {
         this.game.damageNumbers.spawn(shadow.mesh.position.add(new Vector3(0, 1.5, 0)), 0, 'skill');
       }
-    });
+    };
+    canvas.addEventListener('pointerdown', this.soulStockHandler);
   }
 
   private updateSoulSummon(): void {
@@ -1161,6 +1199,7 @@ export class DungeonScene implements GameScene {
 
     const ps = this.getPlayerStats();
     this.shadowArmy.setPlayerStats(ps);
+    this.shadowManageUI.setPlayerStats(ps);
     this.updateHUD();
   }
 
