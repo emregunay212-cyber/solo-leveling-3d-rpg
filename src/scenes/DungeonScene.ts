@@ -329,6 +329,7 @@ export class DungeonScene implements GameScene {
     this.game.shadowProfileManager = this.shadowProfileManager;
     this.game.shadowInventory = this.shadowInventory;
     this.game.gold = this.gold;
+    this.game.skillSystem = this.skillSystem;
     this.game.savedSoulSlots = this.shadowArmy.exportSoulSlots();
 
     // Tum kaynaklari temizle (geri donuste onLoad tekrar olusturur)
@@ -522,7 +523,8 @@ export class DungeonScene implements GameScene {
 
     // Skill system
     this.skillEffects = new SkillEffects(this.game.engine.scene);
-    this.skillSystem = new SkillSystem(this.game.input);
+    this.skillSystem = this.game.skillSystem ?? new SkillSystem(this.game.input);
+    this.game.skillSystem = this.skillSystem;
     this.skillSystem.setOnCast((result) => {
       this.handleSkillCast(result.skill.id, result.damage);
     });
@@ -736,6 +738,8 @@ export class DungeonScene implements GameScene {
       this.dungeonManager.addGold(e.def.goldReward);
       this.levelSystem.addXp(e.def.xpReward);
       this.gold += e.def.goldReward;
+      // Boss drop — ozel yetenek kitaplari dusurur
+      this.dropSystem.rollDrops(bossDef.typeKey, e.def.level);
       this.game.hud.showXpGain(e.def.xpReward);
       this.updateHUD();
 

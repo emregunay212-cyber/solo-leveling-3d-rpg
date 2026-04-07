@@ -216,4 +216,63 @@ export const SHADOW_DROP_TABLES: Readonly<Record<string, readonly DropEntry[]>> 
   dragon: dragonDrops,
   archDemon: archDemonDrops,
   shadowKnight: shadowKnightDrops,
+
+  // ─── DUNGEON BOSSLARI — ozel yetenek kitaplari (yuksek sans) ───
+  goblin_king: [
+    { itemId: 'book_shadow_blade_up', itemType: 'skillbook' as const, chance: 0.40, minLevel: 1 },
+    { itemId: 'book_dark_regen',      itemType: 'skillbook' as const, chance: 0.30, minLevel: 1 },
+  ],
+  giant_rat_queen: [
+    { itemId: 'book_shadow_blade_up', itemType: 'skillbook' as const, chance: 0.35, minLevel: 1 },
+    { itemId: 'book_iron_will',       itemType: 'skillbook' as const, chance: 0.25, minLevel: 1 },
+  ],
+  skeleton_lord: [
+    { itemId: 'book_shadow_shield_up', itemType: 'skillbook' as const, chance: 0.35, minLevel: 5 },
+    { itemId: 'book_iron_will',        itemType: 'skillbook' as const, chance: 0.30, minLevel: 5 },
+  ],
+  spider_queen: [
+    { itemId: 'book_shadow_shield_up', itemType: 'skillbook' as const, chance: 0.30, minLevel: 5 },
+    { itemId: 'book_dark_regen',       itemType: 'skillbook' as const, chance: 0.25, minLevel: 5 },
+  ],
+  orc_warlord: [
+    { itemId: 'book_shadow_burst_up',  itemType: 'skillbook' as const, chance: 0.30, minLevel: 10 },
+    { itemId: 'skill_lightning_chain', itemType: 'skillbook' as const, chance: 0.15, minLevel: 10 },
+  ],
+  werewolf_alpha: [
+    { itemId: 'book_shadow_burst_up',  itemType: 'skillbook' as const, chance: 0.25, minLevel: 10 },
+    { itemId: 'skill_flame_burst',     itemType: 'skillbook' as const, chance: 0.15, minLevel: 10 },
+  ],
+  dark_archmage: [
+    { itemId: 'skill_flame_burst',     itemType: 'skillbook' as const, chance: 0.25, minLevel: 20 },
+    { itemId: 'skill_lightning_chain', itemType: 'skillbook' as const, chance: 0.20, minLevel: 20 },
+    { itemId: 'book_sovereign_aura_up', itemType: 'skillbook' as const, chance: 0.08, minLevel: 20 },
+  ],
+  death_knight_lord: [
+    { itemId: 'skill_blood_rage',      itemType: 'skillbook' as const, chance: 0.20, minLevel: 20 },
+    { itemId: 'skill_flame_burst',     itemType: 'skillbook' as const, chance: 0.15, minLevel: 20 },
+    { itemId: 'book_sovereign_aura_up', itemType: 'skillbook' as const, chance: 0.10, minLevel: 20 },
+  ],
+  demon_lord: [
+    { itemId: 'skill_ice_prison',      itemType: 'skillbook' as const, chance: 0.20, minLevel: 35 },
+    { itemId: 'skill_blood_rage',      itemType: 'skillbook' as const, chance: 0.15, minLevel: 35 },
+    { itemId: 'skill_void_strike',     itemType: 'skillbook' as const, chance: 0.08, minLevel: 35 },
+    { itemId: 'book_sovereign_aura_up', itemType: 'skillbook' as const, chance: 0.12, minLevel: 35 },
+  ],
+  baruka: [
+    { itemId: 'skill_ice_prison',      itemType: 'skillbook' as const, chance: 0.25, minLevel: 35 },
+    { itemId: 'skill_void_strike',     itemType: 'skillbook' as const, chance: 0.12, minLevel: 35 },
+    { itemId: 'skill_shadow_domain',   itemType: 'skillbook' as const, chance: 0.05, minLevel: 35 },
+  ],
+  shadow_monarch: [
+    { itemId: 'skill_shadow_domain',   itemType: 'skillbook' as const, chance: 0.15, minLevel: 60 },
+    { itemId: 'skill_void_strike',     itemType: 'skillbook' as const, chance: 0.20, minLevel: 60 },
+    { itemId: 'skill_ice_prison',      itemType: 'skillbook' as const, chance: 0.15, minLevel: 60 },
+    { itemId: 'book_sovereign_aura_up', itemType: 'skillbook' as const, chance: 0.15, minLevel: 60 },
+  ],
+  kamish: [
+    { itemId: 'skill_shadow_domain',   itemType: 'skillbook' as const, chance: 0.25, minLevel: 60 },
+    { itemId: 'skill_void_strike',     itemType: 'skillbook' as const, chance: 0.25, minLevel: 60 },
+    { itemId: 'skill_ice_prison',      itemType: 'skillbook' as const, chance: 0.20, minLevel: 60 },
+    { itemId: 'skill_blood_rage',      itemType: 'skillbook' as const, chance: 0.20, minLevel: 60 },
+  ],
 } as const;

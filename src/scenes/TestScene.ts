@@ -170,7 +170,8 @@ export class TestScene implements GameScene {
 
     // Skill system
     this.skillEffects = new SkillEffects(this.game.engine.scene);
-    this.skillSystem = new SkillSystem(this.game.input);
+    this.skillSystem = this.game.skillSystem ?? new SkillSystem(this.game.input);
+    this.game.skillSystem = this.skillSystem;
     this.skillSystem.setOnCast((result) => {
       this.handleSkillCast(result.skill.id, result.damage);
     });
@@ -624,6 +625,7 @@ export class TestScene implements GameScene {
     this.game.shadowProfileManager = this.shadowProfileManager;
     this.game.shadowInventory = this.shadowInventory;
     this.game.gold = this.gold;
+    this.game.skillSystem = this.skillSystem;
     this.game.savedSoulSlots = this.shadowArmy.exportSoulSlots();
     this.game.dungeonRank = rank;
 
