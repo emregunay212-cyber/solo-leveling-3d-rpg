@@ -36,6 +36,7 @@ export class Game {
   public savedSoulSlots?: import('./shadows/ShadowArmy').SoulSlot[];
   public skillSystem?: import('./skills/SkillSystem').SkillSystem;
   public playerRankSystem?: import('./progression/PlayerRankSystem').PlayerRankSystem;
+  public savedActiveShadows?: { profile: import('./shadows/ShadowEnhancementTypes').ShadowProfile; hpPercent: number; def: import('./enemies/Enemy').EnemyDef }[];
 
   constructor() {
     this.engine = new Engine('gameCanvas');

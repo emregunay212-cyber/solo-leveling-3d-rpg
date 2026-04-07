@@ -191,6 +191,11 @@ export class TestScene implements GameScene {
     if (this.game.savedSoulSlots) {
       this.shadowArmy.setSoulSlots(this.game.savedSoulSlots);
     }
+    // Kayitli aktif golgeleri yeniden olustur
+    if (this.game.savedActiveShadows && this.game.savedActiveShadows.length > 0) {
+      this.shadowArmy.importActiveShadows(this.game.savedActiveShadows);
+      this.game.savedActiveShadows = undefined;
+    }
     this.shadowSelection = new ShadowSelection(this.game.engine.scene, this.shadowArmy, this.game.input);
     this.shadowSelection.setDamageNumbers(this.game.damageNumbers);
 
@@ -630,6 +635,7 @@ export class TestScene implements GameScene {
     this.game.skillSystem = this.skillSystem;
     this.game.playerRankSystem = this.playerRankSystem;
     this.game.savedSoulSlots = this.shadowArmy.exportSoulSlots();
+    this.game.savedActiveShadows = this.shadowArmy.exportActiveShadows();
     this.game.dungeonRank = rank;
 
     // DungeonScene'e rank aktar ve sahne degistir

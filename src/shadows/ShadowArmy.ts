@@ -286,6 +286,39 @@ export class ShadowArmy {
     }));
   }
 
+  /** Aktif golgelerin profil + HP verisini kaydet (sahne gecisi icin) */
+  public exportActiveShadows(): { profile: ShadowProfile; hpPercent: number; def: EnemyDef }[] {
+    const result: { profile: ShadowProfile; hpPercent: number; def: EnemyDef }[] = [];
+    for (const shadow of this.shadows) {
+      if (!shadow.isAlive()) continue;
+      const profile = shadow.getProfile();
+      if (profile) {
+        result.push({
+          profile: { ...profile, hpPercent: shadow.hp / shadow.maxHp },
+          hpPercent: shadow.hp / shadow.maxHp,
+          def: shadow.def,
+        });
+      }
+    }
+    return result;
+  }
+
+  /** Kaydedilmis aktif golgeleri yeniden olustur (sahne gecisi icin) */
+  public importActiveShadows(
+    saved: { profile: ShadowProfile; hpPercent: number; def: EnemyDef }[],
+  ): void {
+    for (const entry of saved) {
+      const shadow = new ShadowSoldier(
+        this.scene, Vector3.Zero(), entry.def, this.playerStats, entry.profile,
+      );
+      shadow.setHpPercent(entry.hpPercent);
+      shadow.setMode(this.armyMode);
+      if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
+      this.bindShadowOnKill(shadow);
+      this.shadows.push(shadow);
+    }
+  }
+
   // ─── KILL TRACKING ───
 
   /** Golge askerine kill callback'i bagla — profileManager uzerinden kill sayacini arttirir */
