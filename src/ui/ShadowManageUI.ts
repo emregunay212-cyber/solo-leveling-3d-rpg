@@ -14,8 +14,21 @@ import { PLAYER_SKILL_BOOK_DEFS, ENEMY_SKILL_DEFS, BOOK_TO_SKILL_MAP, SKILL_KEY_
 import { SHADOW_ENHANCEMENT } from '../config/GameConfig';
 import { calculateShadowStats, calculateShadowStatsBreakdown } from '../shadows/ShadowStatCalculator';
 import type { StatBreakdown } from '../shadows/ShadowStatCalculator';
+import type { PlayerRankSystem } from '../progression/PlayerRankSystem';
 
-type TabId = 'detail' | 'shop' | 'books';
+type TabId = 'detail' | 'shop' | 'books' | 'skills';
+
+type SlotKey = 'Q' | 'E' | 'R' | 'F';
+
+const SKILL_RANK_COLORS: Readonly<Record<string, string>> = {
+  none: '#888',
+  E: '#4ade80',
+  D: '#60a5fa',
+  C: '#a855f7',
+  B: '#f59e0b',
+  A: '#ef4444',
+  S: '#ec4899',
+};
 
 const RANK_COLORS: Record<string, string> = {
   soldier: '#aaa', knight: '#4ade80', elite: '#60a5fa', commander: '#f59e0b',
@@ -36,6 +49,9 @@ export class ShadowManageUI {
   private inventory: ShadowInventory;
   private getEnemyDef: (name: string) => EnemyDef | null;
   private onUseBookCb: ((bookId: string) => boolean) | null = null;
+  private playerRankSystem: PlayerRankSystem | null = null;
+  private inDungeon = false;
+  private pendingSkillId: string | null = null;
 
   constructor(
     profileManager: ShadowProfileManager,
@@ -84,6 +100,16 @@ export class ShadowManageUI {
   /** Kitap kullanma callback'i — TestScene tarafindan baglanir */
   public setOnUseBook(cb: (bookId: string) => boolean): void {
     this.onUseBookCb = cb;
+  }
+
+  /** PlayerRankSystem referansini bagla — skills tab icin gerekli */
+  public setPlayerRankSystem(prs: PlayerRankSystem): void {
+    this.playerRankSystem = prs;
+  }
+
+  /** Dungeon icinde olup olmadigini ayarla — skills tab'i kilitler */
+  public setInDungeon(value: boolean): void {
+    this.inDungeon = value;
   }
 
   public refresh(): void {
@@ -180,6 +206,45 @@ export class ShadowManageUI {
         outline:none; width:160px;
       }
       .smu-nickname-input:focus { border-color:#c084fc; box-shadow:0 0 6px rgba(192,132,252,0.3); }
+      .smu-slot-row {
+        display:flex; align-items:center; gap:8px; padding:5px 8px;
+        background:rgba(20,8,40,0.6); border-radius:4px; margin-bottom:4px;
+      }
+      .smu-slot-key {
+        display:inline-flex; align-items:center; justify-content:center;
+        width:28px; height:28px; border-radius:4px; font-size:13px;
+        font-weight:700; color:#fff; flex-shrink:0;
+      }
+      .smu-slot-info { flex:1; color:#e0d4fc; font-size:12px; }
+      .smu-slot-empty { color:rgba(255,255,255,0.3); font-style:italic; font-size:11px; }
+      .smu-slot-clear {
+        width:22px; height:22px; border-radius:3px; border:1px solid rgba(239,68,68,0.3);
+        background:rgba(239,68,68,0.1); color:#ef4444; font-size:12px; cursor:pointer;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      }
+      .smu-slot-clear:hover { background:rgba(239,68,68,0.25); }
+      .smu-pool-item {
+        display:flex; align-items:center; gap:8px; padding:5px 8px;
+        background:rgba(20,8,40,0.5); border-radius:4px; margin-bottom:3px;
+        cursor:pointer; transition:background 0.1s;
+      }
+      .smu-pool-item:hover { background:rgba(120,60,200,0.15); }
+      .smu-pool-item.selected { background:rgba(168,85,247,0.2); border:1px solid rgba(168,85,247,0.4); }
+      .smu-assign-popup {
+        display:flex; gap:4px; margin-left:auto;
+      }
+      .smu-assign-btn {
+        padding:2px 8px; font-size:10px; font-weight:700; border-radius:3px;
+        border:1px solid rgba(168,85,247,0.4); background:rgba(168,85,247,0.15);
+        color:#c084fc; cursor:pointer; transition:background 0.15s;
+      }
+      .smu-assign-btn:hover { background:rgba(168,85,247,0.35); }
+      .smu-assign-btn.disabled { opacity:0.3; pointer-events:none; }
+      .smu-dungeon-warn {
+        color:#f59e0b; font-size:11px; font-weight:600; text-align:center;
+        padding:8px; background:rgba(245,158,11,0.08); border-radius:4px;
+        border:1px solid rgba(245,158,11,0.2); margin-bottom:8px;
+      }
     </style>
     <div class="smu-overlay" id="smu-overlay"></div>
     <div class="smu-modal">
@@ -196,6 +261,7 @@ export class ShadowManageUI {
         <div class="smu-tab active" data-tab="detail">DETAY</div>
         <div class="smu-tab" data-tab="shop">DUKKAN</div>
         <div class="smu-tab" data-tab="books">KITAPLAR</div>
+        <div class="smu-tab" data-tab="skills">YETENEKLER</div>
       </div>
     </div>`;
   }
@@ -276,6 +342,7 @@ export class ShadowManageUI {
       case 'detail': this.renderDetailTab(); break;
       case 'shop': this.renderShopTab(); break;
       case 'books': this.renderBooksTab(); break;
+      case 'skills': this.renderSkillsTab(); break;
     }
   }
 
@@ -494,6 +561,165 @@ export class ShadowManageUI {
             this.refresh();
           }
         }
+      });
+    });
+  }
+
+  // ─── SKILLS TAB (player Q/E/R/F skill management) ───
+
+  private renderSkillsTab(): void {
+    const right = this.container.querySelector('#smu-right') as HTMLDivElement;
+
+    if (!this.playerRankSystem) {
+      right.innerHTML = '<div class="smu-empty">Yetenek sistemi henuz yuklenmedi</div>';
+      return;
+    }
+
+    const prs = this.playerRankSystem;
+    const slotAssignments = prs.getSlotAssignments();
+    const skillPool = prs.getSkillPool();
+    const playerRank = prs.getRank();
+    const totalPower = prs.getTotalPower();
+    const slots: SlotKey[] = ['Q', 'E', 'R', 'F'];
+
+    const slotColors: Record<SlotKey, string> = {
+      Q: '#4ade80', E: '#60a5fa', R: '#f59e0b', F: '#ec4899',
+    };
+
+    let html = '';
+
+    // Dungeon warning
+    if (this.inDungeon) {
+      html += '<div class="smu-dungeon-warn">Dungeon icinde yetenek degistirilemez</div>';
+    }
+
+    // ─── AKTIF YETENEKLER (current slot assignments) ───
+    html += '<div class="smu-section"><div class="smu-section-title">AKTIF YETENEKLER</div>';
+
+    for (const slot of slots) {
+      const skillId = slotAssignments[slot];
+      const skill = skillId ? skillPool.find(s => s.id === skillId) ?? null : null;
+      const slotColor = slotColors[slot];
+
+      html += `<div class="smu-slot-row">`;
+      html += `<span class="smu-slot-key" style="background:${slotColor}">${slot}</span>`;
+
+      if (skill) {
+        const rc = SKILL_RANK_COLORS[skill.rank] ?? '#888';
+        html += `<span class="smu-slot-info">
+          <span style="font-weight:600">${skill.name}</span>
+          <span style="color:${rc};font-size:10px;margin-left:4px">${skill.rank}-Rank</span>
+          <span style="color:rgba(255,255,255,0.4);font-size:10px;margin-left:4px">P:${skill.power}</span>
+        </span>`;
+        if (!this.inDungeon) {
+          html += `<span class="smu-slot-clear" data-clear-slot="${slot}" title="Slotu temizle">&times;</span>`;
+        }
+      } else {
+        html += `<span class="smu-slot-empty">— bos —</span>`;
+      }
+
+      html += `</div>`;
+    }
+
+    // Rank + power summary
+    const rankColor = SKILL_RANK_COLORS[playerRank] ?? '#888';
+    html += `<div style="display:flex;justify-content:space-between;margin-top:6px;padding:4px 8px;
+      background:rgba(20,8,40,0.4);border-radius:4px">
+      <span style="color:rgba(255,255,255,0.5);font-size:11px">Oyuncu Rank:
+        <span style="color:${rankColor};font-weight:700">${playerRank === 'none' ? '-' : playerRank}</span>
+      </span>
+      <span style="color:rgba(255,255,255,0.5);font-size:11px">Toplam Guc:
+        <span style="color:#c084fc;font-weight:700">${totalPower}</span>
+      </span>
+    </div>`;
+    html += '</div>';
+
+    // ─── YETENEK HAVUZU (all learned skills) ───
+    html += '<div class="smu-section"><div class="smu-section-title">YETENEK HAVUZU</div>';
+
+    if (skillPool.length === 0) {
+      html += '<div class="smu-empty">Henuz ogrenilmis yetenek yok</div>';
+    } else {
+      // Build a set of currently assigned skill IDs
+      const assignedSlotMap = new Map<string, SlotKey>();
+      for (const slot of slots) {
+        const sid = slotAssignments[slot];
+        if (sid) assignedSlotMap.set(sid, slot);
+      }
+
+      for (const skill of skillPool) {
+        const rc = SKILL_RANK_COLORS[skill.rank] ?? '#888';
+        const assignedTo = assignedSlotMap.get(skill.id);
+        const isSelected = this.pendingSkillId === skill.id;
+
+        html += `<div class="smu-pool-item${isSelected ? ' selected' : ''}" data-pool-skill="${skill.id}">`;
+        html += `<span style="color:#e0d4fc;font-size:12px;font-weight:600;flex:1">${skill.name}</span>`;
+        html += `<span style="color:${rc};font-size:10px;font-weight:700;min-width:50px">${skill.rank}-Rank</span>`;
+        html += `<span style="color:rgba(255,255,255,0.4);font-size:10px;min-width:30px">P:${skill.power}</span>`;
+
+        if (assignedTo) {
+          const sc = slotColors[assignedTo];
+          html += `<span style="color:${sc};font-size:10px;font-weight:700;min-width:20px;text-align:center">[${assignedTo}]</span>`;
+        } else if (isSelected && !this.inDungeon) {
+          // Show slot assignment buttons
+          html += `<div class="smu-assign-popup">`;
+          for (const s of slots) {
+            html += `<span class="smu-assign-btn" data-assign-slot="${s}" data-assign-skill="${skill.id}">${s}</span>`;
+          }
+          html += `</div>`;
+        } else {
+          html += `<span style="min-width:20px;text-align:center;color:rgba(255,255,255,0.2);font-size:10px">[ ]</span>`;
+        }
+
+        html += `</div>`;
+      }
+
+      if (!this.inDungeon) {
+        html += `<div style="color:rgba(255,255,255,0.3);font-size:10px;margin-top:6px;text-align:center">
+          Bir yetenege tikla → slot sec
+        </div>`;
+      }
+    }
+    html += '</div>';
+
+    right.innerHTML = html;
+
+    // ─── EVENT BINDING ───
+
+    // Clear slot buttons
+    right.querySelectorAll('[data-clear-slot]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const slotKey = (el as HTMLElement).dataset['clearSlot'] as string;
+        prs.clearSlot(slotKey);
+        this.pendingSkillId = null;
+        this.renderSkillsTab();
+      });
+    });
+
+    // Pool item click — toggle selection
+    right.querySelectorAll('[data-pool-skill]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (this.inDungeon) return;
+        const skillId = (el as HTMLElement).dataset['poolSkill'] as string;
+        this.pendingSkillId = this.pendingSkillId === skillId ? null : skillId;
+        this.renderSkillsTab();
+      });
+    });
+
+    // Assign buttons
+    right.querySelectorAll('[data-assign-slot]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const slotKey = (el as HTMLElement).dataset['assignSlot'] as string;
+        const skillId = (el as HTMLElement).dataset['assignSkill'] as string;
+        const success = prs.assignSkillToSlot(slotKey, skillId);
+        if (success) {
+          const skill = skillPool.find(s => s.id === skillId);
+          this.showNotification(`${skill?.name ?? skillId} → ${slotKey} slotuna atandi`);
+        }
+        this.pendingSkillId = null;
+        this.renderSkillsTab();
       });
     });
   }

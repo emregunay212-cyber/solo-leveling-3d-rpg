@@ -244,6 +244,8 @@ export class TestScene implements GameScene {
       this.shadowInventory,
       (name: string) => ENEMY_DEFS[name] ?? DUNGEON_BOSS_DEFS[name] ?? null,
     );
+    this.shadowManageUI.setPlayerRankSystem(this.playerRankSystem);
+    this.shadowManageUI.setInDungeon(false);
     this.shadowStockPicker = new ShadowStockPicker();
 
     // Dungeon gate secim paneli
@@ -626,6 +628,7 @@ export class TestScene implements GameScene {
     this.game.shadowInventory = this.shadowInventory;
     this.game.gold = this.gold;
     this.game.skillSystem = this.skillSystem;
+    this.game.playerRankSystem = this.playerRankSystem;
     this.game.savedSoulSlots = this.shadowArmy.exportSoulSlots();
     this.game.dungeonRank = rank;
 

@@ -581,6 +581,10 @@ export class DungeonScene implements GameScene {
       this.shadowInventory,
       (name: string) => ENEMY_DEFS[name] ?? DUNGEON_BOSS_DEFS[name] ?? null,
     );
+    if (this.game.playerRankSystem) {
+      this.shadowManageUI.setPlayerRankSystem(this.game.playerRankSystem);
+    }
+    this.shadowManageUI.setInDungeon(true);
 
     // Soul slot click opens manage UI with that slot's shadow selected
     this.shadowUI.setOnSlotClick((slotIndex: number) => {

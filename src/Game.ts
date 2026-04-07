@@ -35,6 +35,7 @@ export class Game {
   public gold = 0;
   public savedSoulSlots?: import('./shadows/ShadowArmy').SoulSlot[];
   public skillSystem?: import('./skills/SkillSystem').SkillSystem;
+  public playerRankSystem?: import('./progression/PlayerRankSystem').PlayerRankSystem;
 
   constructor() {
     this.engine = new Engine('gameCanvas');
