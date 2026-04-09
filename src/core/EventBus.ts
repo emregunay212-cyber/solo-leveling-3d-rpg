@@ -35,6 +35,28 @@ export interface GameEvents {
   'dungeon:bossDeath': { bossType: string };
   'dungeon:waveCleared': { remaining: number };
   'player:rankChanged': { oldRank: PlayerRank; newRank: PlayerRank };
+
+  // ─── Charge Sistemi ───
+  'charge:start':   { skillId: string };
+  'charge:level':   { skillId: string; level: string };
+  'charge:release': { skillId: string; level: string };
+  'charge:cancel':  { skillId: string };
+
+  // ─── Combo Zinciri ───
+  'combo:chain':  { name: string; from: string; to: string; bonus: number };
+  'combo:streak': { count: number };
+
+  // ─── Parry ───
+  'parry:success': { reflectedDamage: number; stunDuration?: number };
+
+  // ─── Arise ───
+  'arise:attempt': { position: { x: number; y: number; z: number } };
+  'arise:success': { shadowType: string };
+  'arise:fail':    { reason: string };
+
+  // ─── Slow Motion ───
+  'slowmo:start': { scale: number; duration: number };
+  'slowmo:end':   Record<string, never>;
 }
 
 type EventCallback<T> = (data: T) => void;

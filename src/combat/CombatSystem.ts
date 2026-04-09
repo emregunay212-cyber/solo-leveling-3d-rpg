@@ -116,4 +116,32 @@ export class CombatSystem {
 
     return hits;
   }
+
+  /**
+   * 360° AoE attack — 4. combo finisher ve skill AoE'leri icin
+   */
+  public aoeAttack(
+    center: Vector3,
+    radius: number,
+    baseDamage: number,
+  ): { target: Damageable; damage: number; isCritical: boolean }[] {
+    const hits: { target: Damageable; damage: number; isCritical: boolean }[] = [];
+
+    for (const target of this.targets) {
+      if (!target.isAlive()) continue;
+      const toTarget = target.mesh.position.subtract(center);
+      toTarget.y = 0;
+      if (toTarget.length() > radius) continue;
+
+      const isCritical = Math.random() < this.CRIT_CHANCE;
+      const critMultiplier = isCritical ? COMBAT.critMultiplier : 1.0;
+      const variance = COMBAT.damageVarianceMin + Math.random() * COMBAT.damageVarianceRange;
+      const damage = Math.round(baseDamage * critMultiplier * variance);
+
+      target.takeDamage(damage, isCritical, center);
+      hits.push({ target, damage, isCritical });
+    }
+
+    return hits;
+  }
 }

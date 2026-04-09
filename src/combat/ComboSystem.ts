@@ -16,7 +16,7 @@ export class ComboSystem {
   private attackSpeedMult = 1.0;
 
   // Combo definitions from central config
-  private readonly COMBO_STEPS = COMBO.hits;
+  public readonly COMBO_STEPS = COMBO.hits;
 
   public update(dt: number): void {
     // Attack animation timer

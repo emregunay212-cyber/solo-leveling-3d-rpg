@@ -44,6 +44,7 @@ export class PlayerController {
   // State
   private currentSpeed = 0;
   private targetRotationY = 0;
+  private moveSpeedMult = 1.0;
 
   // Block
   private isBlockingState = false;
@@ -129,7 +130,7 @@ export class PlayerController {
       const right = this.camera.getRightDirection();
       moveDir = forward.scale(moveInput.z).add(right.scale(moveInput.x)).normalize();
       this.targetRotationY = Math.atan2(moveDir.x, moveDir.z);
-      speed = this.input.isSprinting() ? this.SPRINT_SPEED : this.WALK_SPEED;
+      speed = (this.input.isSprinting() ? this.SPRINT_SPEED : this.WALK_SPEED) * this.moveSpeedMult;
     } else if (this.autoMoveTarget) {
       const toTarget = this.autoMoveTarget.subtract(this.mesh.position);
       toTarget.y = 0;
@@ -215,6 +216,9 @@ export class PlayerController {
   public getIsGrounded(): boolean { return true; }
   public getCurrentSpeed(): number { return this.currentSpeed; }
   public setCamera(camera: PlayerCamera): void { this.camera = camera; }
+  /** Skill charge sirasinda hareket hizini kisit — 0.0 = tam dondur, 1.0 = normal */
+  public setMoveSpeedMultiplier(mult: number): void { this.moveSpeedMult = Math.max(0, Math.min(2, mult)); }
+  public getMoveSpeedMultiplier(): number { return this.moveSpeedMult; }
 
   // ─── Skill: Dash ───
   private isDashing = false;

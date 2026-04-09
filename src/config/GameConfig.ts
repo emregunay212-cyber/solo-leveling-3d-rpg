@@ -50,9 +50,10 @@ export const COMBAT = {
 // ─── COMBO ───
 export const COMBO = {
   hits: [
-    { damageMultiplier: 1.0, duration: 0.35, window: 0.5 },
-    { damageMultiplier: 1.2, duration: 0.35, window: 0.5 },
-    { damageMultiplier: 1.8, duration: 0.5,  window: 0.0 },
+    { damageMultiplier: 1.0, duration: 0.35, window: 0.5, aoeRadius: 0 },
+    { damageMultiplier: 1.2, duration: 0.35, window: 0.5, aoeRadius: 0 },
+    { damageMultiplier: 1.8, duration: 0.5,  window: 0.6, aoeRadius: 0 },
+    { damageMultiplier: 2.2, duration: 0.6,  window: 0.0, aoeRadius: 2.5 }, // 4. vuruş: 360° AoE finisher
   ],
   cooldownBuffer: 0.05,
   finisherCooldownBuffer: 0.3,
@@ -331,6 +332,125 @@ export const SHADOW_ENHANCEMENT = {
     { rank: 'elite', name: 'Elit', requiredKills: 50, statPercent: 0.35 },
     { rank: 'commander', name: 'Komutan', requiredKills: 150, statPercent: 0.40 },
   ],
+} as const;
+
+// ─── CHARGE SISTEMI ───
+export const CHARGE = {
+  defaultLv1Threshold: 0.3,
+  defaultMaxThreshold: 2.0,
+} as const;
+
+// ─── SKILL CHARGE KONFIGURASYONLARI ───
+export const SKILL_CHARGE: Record<string, import('../skills/SkillDef').SkillChargeConfig> = {
+  shadowBlade: {
+    lv1Threshold: 0.3, maxThreshold: 2.0,
+    canMoveWhileCharging: true, moveSpeedMultiplier: 0.3,
+    tap:  { range: 6,  damageMult: 1.5, mpCost: 15 },
+    lv1:  { range: 10, damageMult: 2.2, mpCost: 20 },
+    max:  { range: 16, damageMult: 3.5, mpCost: 30, extra: 'shockwave+slowmo' },
+  },
+  shadowShield: {
+    lv1Threshold: 0.3, maxThreshold: 2.0,
+    canMoveWhileCharging: true, moveSpeedMultiplier: 1.0,
+    tap:  { range: 0, damageMult: 0, mpCost: 25, duration: 3,  damageReduction: 0.6, parryWindow: 0.4 },
+    lv1:  { range: 0, damageMult: 0, mpCost: 35, duration: 5,  damageReduction: 0.6, parryWindow: 0.6 },
+    max:  { range: 0, damageMult: 0, mpCost: 50, duration: 8,  damageReduction: 0.8, parryWindow: 1.0, extra: 'burst_on_break' },
+  },
+  shadowBurst: {
+    lv1Threshold: 0.3, maxThreshold: 2.0,
+    canMoveWhileCharging: true, moveSpeedMultiplier: 0.5,
+    tap:  { range: 4,  damageMult: 3.0, mpCost: 40 },
+    lv1:  { range: 6,  damageMult: 4.5, mpCost: 55 },
+    max:  { range: 9,  damageMult: 7.0, mpCost: 75, extra: '3x_explosion' },
+  },
+  sovereignAura: {
+    lv1Threshold: 0.5, maxThreshold: 2.0,
+    canMoveWhileCharging: false, moveSpeedMultiplier: 0.0,
+    tap:  { range: 8,  damageMult: 5.0, mpCost: 80 },
+    lv1:  { range: 8,  damageMult: 5.0, mpCost: 80 },
+    max:  { range: 14, damageMult: 9.0, mpCost: 120, extra: 'cinematic+arise' },
+  },
+  // Boss skill'ler (tam charge yok, sadece tap/tap+bonus)
+  skill_flame_burst: {
+    lv1Threshold: 0.5, maxThreshold: 1.5,
+    canMoveWhileCharging: true, moveSpeedMultiplier: 0.8,
+    tap:  { range: 3, damageMult: 2.5, mpCost: 30 },
+    lv1:  { range: 4, damageMult: 3.5, mpCost: 40 },
+    max:  { range: 5, damageMult: 4.5, mpCost: 50, extra: 'dot' },
+  },
+  skill_lightning_chain: {
+    lv1Threshold: 0.5, maxThreshold: 1.5,
+    canMoveWhileCharging: true, moveSpeedMultiplier: 1.0,
+    tap:  { range: 12, damageMult: 2.0, mpCost: 35 },
+    lv1:  { range: 12, damageMult: 2.8, mpCost: 45 },
+    max:  { range: 15, damageMult: 3.5, mpCost: 55, extra: '6_jumps' },
+  },
+  skill_ice_prison: {
+    lv1Threshold: 0.5, maxThreshold: 1.5,
+    canMoveWhileCharging: true, moveSpeedMultiplier: 0.7,
+    tap:  { range: 4, damageMult: 1.5, mpCost: 45 },
+    lv1:  { range: 5, damageMult: 2.0, mpCost: 55 },
+    max:  { range: 7, damageMult: 2.5, mpCost: 70, extra: 'burst_on_break' },
+  },
+  skill_blood_rage: {
+    lv1Threshold: 0.5, maxThreshold: 1.5,
+    canMoveWhileCharging: true, moveSpeedMultiplier: 1.0,
+    tap:  { range: 0, damageMult: 0, mpCost: 35, duration: 8 },
+    lv1:  { range: 0, damageMult: 0, mpCost: 45, duration: 10 },
+    max:  { range: 0, damageMult: 0, mpCost: 60, duration: 12, extra: 'lifesteal' },
+  },
+  skill_shadow_domain: {
+    lv1Threshold: 0.5, maxThreshold: 2.0,
+    canMoveWhileCharging: false, moveSpeedMultiplier: 0.0,
+    tap:  { range: 18, damageMult: 6.0, mpCost: 100 },
+    lv1:  { range: 18, damageMult: 6.0, mpCost: 100 },
+    max:  { range: 18, damageMult: 6.0, mpCost: 100, extra: 'cinematic' },
+  },
+  skill_void_strike: {
+    lv1Threshold: 0.5, maxThreshold: 1.5,
+    canMoveWhileCharging: true, moveSpeedMultiplier: 0.7,
+    tap:  { range: 12, damageMult: 4.0, mpCost: 50 },
+    lv1:  { range: 16, damageMult: 5.5, mpCost: 65 },
+    max:  { range: 20, damageMult: 7.0, mpCost: 80, extra: 'blind_trail' },
+  },
+};
+
+// ─── COMBO ZINCIR SISTEMI ───
+export const COMBO_CHAIN = {
+  windowDuration: 1.5,   // saniye
+  streakDecay: 3.0,      // streak sifirlanma suresi
+} as const;
+
+// ─── PARRY ───
+export const PARRY_CONFIG = {
+  defaultWindow: 0.4,
+  defaultStun: 0.5,
+  defaultReflect: 0.3,
+} as const;
+
+// ─── ARISE SISTEMI ───
+export const ARISE = {
+  baseChance: 0.6,
+  intBonusPerPoint: 0.005,
+  holdDuration: 1.0,
+  bossHoldDuration: 2.0,
+  bossBaseChance: 0.4,
+  corpseExpireTime: 15,
+  promptRadius: 3.5,     // Bu mesafeye girince E-Arise prompt gorunur
+} as const;
+
+// ─── SLOW MOTION ───
+export const SLOW_MOTION = {
+  parryScale: 0.3,
+  parryDuration: 0.15,
+  dashMaxScale: 0.3,
+  dashMaxDuration: 0.1,
+  ultimateScale: 0.2,
+  ultimateDuration: 0.2,
+  comboHit4Scale: 0.3,
+  comboHit4Duration: 0.05,
+  domainScale: 0.2,
+  domainDuration: 0.3,
 } as const;
 
 // ─── UI ───

@@ -24,7 +24,7 @@ import { HUD } from '../ui/HUD';
 import { ClickIndicator } from '../ui/ClickIndicator';
 import { Enemy } from '../enemies/Enemy';
 import { LevelSystem } from '../progression/LevelSystem';
-import { DUNGEON, SCENE, SHADOW, SKILLS, MP } from '../config/GameConfig';
+import { DUNGEON, SCENE, SHADOW, SKILLS, MP, SKILL_CHARGE, PARRY_CONFIG } from '../config/GameConfig';
 import { DUNGEON_RANK_DEFS } from '../dungeon/DungeonDefs';
 import { ENEMY_DEFS } from '../data/enemies';
 import { DUNGEON_BOSS_DEFS } from '../data/dungeonBosses';
@@ -47,6 +47,19 @@ import { ShadowManageUI } from '../ui/ShadowManageUI';
 import { initDevConsole, disposeDevConsole } from '../systems/DevConsole';
 import type { DungeonRank } from '../dungeon/types';
 import type { PlayerStats } from '../shadows/ShadowEnhancementTypes';
+import { BOSS_SKILL_DEFS } from '../data/shadowSkillBooks';
+import { SafeZone, SafeZoneRegistry, createSafeZoneMesh } from '../systems/SafeZone';
+import { SkillVFXManager } from '../vfx/SkillVFXManager';
+import { ComboChainSystem } from '../skills/ComboChainSystem';
+import { ParrySystem } from '../skills/ParrySystem';
+import { TargetingSystem } from '../skills/TargetingSystem';
+import { ComboUI } from '../ui/ComboUI';
+import { TargetingUI } from '../ui/TargetingUI';
+import { AriseUI } from '../ui/AriseUI';
+import type { ChargeLevel } from '../skills/ChargeSystem';
+import type { SkillCastResult } from '../skills/SkillSystem';
+import { playParryVFX } from '../vfx/skills/ParryVFX';
+import { playAriseVFX } from '../vfx/skills/AriseVFX';
 
 /** Arena duvar kalinligi */
 const WALL_THICKNESS = 2;
@@ -91,6 +104,7 @@ export class DungeonScene implements GameScene {
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
   private shadowControlHandler: ((e: PointerEvent) => void) | null = null;
   private soulStockHandler: ((e: PointerEvent) => void) | null = null;
+  private safeZoneMesh: Mesh | null = null;
   private clickIndicator!: ClickIndicator;
   private levelSystem!: LevelSystem;
   private deathScreen!: DeathScreen;
@@ -105,6 +119,16 @@ export class DungeonScene implements GameScene {
   private shadowProfileManager!: ShadowProfileManager;
   private shadowInventory!: ShadowInventory;
   private dropSystem!: DropSystem;
+
+  // Yeni sistemler
+  private comboChainSystem!: ComboChainSystem;
+  private parrySystem!: ParrySystem;
+  private targetingSystem!: TargetingSystem;
+  private comboUI!: ComboUI;
+  private targetingUI!: TargetingUI;
+  private ariseUI!: AriseUI;
+  private activeChargeSkillId: string | null = null;
+  private activeChargeLevel: ChargeLevel | null = null;
 
   // Boss spawn zamanlayici
   private bossSpawnTimer = -1;
@@ -145,6 +169,7 @@ export class DungeonScene implements GameScene {
     this.initCombat(scene);
     this.initProgression();
     this.initUI(scene);
+    this.setupSafeZone(scene);
     this.spawnEnemies(scene);
     this.createExitPortal(scene);
     this.shadowSelection.setEnemies(this.enemies);
@@ -304,8 +329,35 @@ export class DungeonScene implements GameScene {
     this.checkPortalProximity(dt);
 
     this.updateComboIndicator();
+    this.updateArisePrompt();
+    this.comboChainSystem.update(dt);
+    this.parrySystem.update(dt);
     this.game.hud.setBlocking(ctx.player.isBlocking);
     this.updateHUD();
+  }
+
+  /** Yakin cesetlerde Arise prompt'unu goster */
+  private updateArisePrompt(): void {
+    const playerPos = this.game.player.getPosition();
+    const ARISE_RANGE = 3.0;
+    let hasNearCorpse = false;
+    let nearBoss = false;
+
+    for (const enemy of this.enemies) {
+      if (!enemy.isExtractable()) continue;
+      const dist = Vector3.Distance(enemy.mesh.position, playerPos);
+      if (dist <= ARISE_RANGE) {
+        hasNearCorpse = true;
+        if (enemy.def.isBoss) nearBoss = true;
+        break;
+      }
+    }
+
+    if (hasNearCorpse) {
+      this.ariseUI.showPrompt(nearBoss);
+    } else {
+      this.ariseUI.hidePrompt();
+    }
   }
 
   onExit(): void {
@@ -369,10 +421,19 @@ export class DungeonScene implements GameScene {
     this.shadowArmy?.dispose();
     this.shadowSelection?.dispose();
     this.shadowUI?.dispose();
+    this.comboUI?.dispose();
+    this.targetingUI?.dispose();
+    this.targetingSystem?.dispose();
+    this.ariseUI?.dispose();
     if (this.exitPortal) { this.exitPortal.dispose(); }
     if (this.victoryPortal) { this.victoryPortal.dispose(); this.victoryPortal = null; }
     this.shadowStockPicker?.dispose();
     this.shadowManageUI?.dispose();
+    if (this.safeZoneMesh) {
+      this.safeZoneMesh.dispose(false, true);
+      this.safeZoneMesh = null;
+    }
+    SafeZoneRegistry.removeAll();
     disposeDevConsole();
   }
 
@@ -522,14 +583,42 @@ export class DungeonScene implements GameScene {
 
     this.damageCalculator = new DamageCalculator(this.levelSystem, this.game.damageNumbers);
 
-    // Skill system
+    // Skill system + VFX manager
     this.skillEffects = new SkillEffects(this.game.engine.scene);
+    const vfxMgr = new SkillVFXManager(
+      this.game.engine.scene,
+      this.game.playerCamera.camera,
+    );
+    this.skillEffects.setVFXManager(vfxMgr);
     this.skillSystem = this.game.skillSystem ?? new SkillSystem(this.game.input);
     this.game.skillSystem = this.skillSystem;
-    this.skillSystem.setOnCast((result) => {
-      this.handleSkillCast(result.skill.id, result.damage);
+    this.skillSystem.setOnCast((result: SkillCastResult) => {
+      this.handleSkillCast(result);
     });
     this.damageCalculator.setShieldReductionGetter(() => this.skillSystem.getShieldReduction());
+
+    // Combo + Parry sistemleri
+    this.comboChainSystem = new ComboChainSystem();
+    this.parrySystem = new ParrySystem();
+
+    // Charge callbacks
+    this.skillSystem.setOnChargeStart((skillId, _key) => {
+      this.activeChargeSkillId = skillId;
+      this.activeChargeLevel = 'tap';
+      this.game.player.setMoveSpeedMultiplier(0.4);
+    });
+    this.skillSystem.setOnChargeLevel((level, skillId) => {
+      this.activeChargeLevel = level;
+      this.skillBar.updateCharge(skillId, 0, 1, level);
+    });
+    this.skillSystem.setOnChargeEnd(() => {
+      if (this.activeChargeSkillId) {
+        this.skillBar.updateCharge(this.activeChargeSkillId, 0, 1, null);
+      }
+      this.activeChargeSkillId = null;
+      this.activeChargeLevel = null;
+      this.game.player.setMoveSpeedMultiplier(1.0);
+    });
 
     // Shadow systems — Game uzerinden paylasilan varsa kullan
     this.shadowProfileManager = this.game.shadowProfileManager ?? new ShadowProfileManager();
@@ -581,6 +670,11 @@ export class DungeonScene implements GameScene {
     this.skillBar = new SkillBar();
     this.skillBar.initSlots(this.skillSystem.getSlots());
     this.shadowUI = new ShadowUI();
+
+    this.comboUI = new ComboUI();
+    this.targetingUI = new TargetingUI();
+    this.targetingSystem = new TargetingSystem(scene, this.game.playerCamera.camera);
+    this.ariseUI = new AriseUI();
 
     this.shadowManageUI = new ShadowManageUI(
       this.shadowProfileManager,
@@ -641,6 +735,25 @@ export class DungeonScene implements GameScene {
 
   // ═══════════════════════════════════════════
   //  ENEMY SPAWNING
+  // ═══════════════════════════════════════════
+
+  private setupSafeZone(scene: Scene): void {
+    SafeZoneRegistry.removeAll();
+
+    const arenaSize = DUNGEON.arenaSize[this.rank];
+    const spawnZ = -(arenaSize / 4);
+    const center = new Vector3(0, 0, spawnZ);
+    const radius = 6;
+    const zone = new SafeZone(center, radius);
+    SafeZoneRegistry.addZone(zone);
+
+    // Mavi tonlu gorsel (dungeon icin)
+    this.safeZoneMesh = createSafeZoneMesh(
+      scene, center, radius,
+      new Color3(0.37, 0.65, 0.97), // mavi
+    );
+  }
+
   // ═══════════════════════════════════════════
 
   private spawnEnemies(scene: Scene): void {
@@ -886,6 +999,26 @@ export class DungeonScene implements GameScene {
   private handleEnemyAttack(enemy: Enemy, rawDamage: number, isBackstab: boolean): void {
     if (!this.playerAlive) return;
 
+    // Parry sistemi kontrol
+    const parryResult = this.parrySystem.checkParry(rawDamage, enemy);
+    if (parryResult !== null) {
+      const reflected = parryResult.reflectedDamage;
+      if (reflected > 0) {
+        enemy.takeDamage(reflected, false, this.game.player.getPosition());
+        this.game.damageNumbers.spawn(
+          enemy.mesh.position.add(new Vector3(0, 1.5, 0)),
+          reflected,
+          'critical',
+        );
+      }
+      const vfxMgr = this.skillEffects.getVFXManager();
+      if (vfxMgr) {
+        playParryVFX(vfxMgr, this.game.engine.scene, this.game.player.getPosition());
+      }
+      eventBus.emit('parry:success', { reflectedDamage: reflected });
+      return;
+    }
+
     const result = this.damageCalculator.calculateIncomingDamage(rawDamage, isBackstab, {
       playerPos: this.game.player.getPosition(),
       playerRotY: this.game.player.mesh.rotation.y,
@@ -1002,10 +1135,18 @@ export class DungeonScene implements GameScene {
 
     if (success) {
       enemy.markExtracted();
-      this.game.damageNumbers.spawn(pos.add(new Vector3(0, 2, 0)), 0, 'arise');
+      const isBoss = enemy.def.isBoss;
+      this.ariseUI.showAriseLabel(isBoss);
+      const vfxMgr = this.skillEffects.getVFXManager();
+      if (vfxMgr) {
+        playAriseVFX(vfxMgr, this.game.engine.scene, pos.add(new Vector3(0, 0.1, 0)));
+      }
+      eventBus.emit('arise:success', { shadowType: enemy.typeKey });
     } else {
+      this.ariseUI.showFailMessage();
       this.game.damageNumbers.spawn(pos.add(new Vector3(0, 2, 0)), 0, 'extract_fail');
       enemy.markExtracted();
+      eventBus.emit('arise:fail', { reason: 'resistance' });
     }
   }
 
@@ -1084,42 +1225,144 @@ export class DungeonScene implements GameScene {
     }
   }
 
-  private handleSkillCast(skillId: string, damage: number): void {
+  private handleSkillCast(result: SkillCastResult): void {
+    const { skill, damage, chargeLevel, range } = result;
+    const skillId = skill.id;
     const playerPos = this.game.player.getPosition();
+
+    // Combo bonus kontrol
+    const comboBonus = this.comboChainSystem.checkCombo(skillId);
+    const finalDamage = comboBonus ? Math.round(damage * comboBonus.damageMult) : damage;
+    const finalRange = comboBonus?.doubleAoe ? range * 2 : (comboBonus?.rangeMult ?? 1) * range;
+
+    if (comboBonus) {
+      this.comboUI.showComboName(comboBonus.link.name);
+    }
 
     switch (skillId) {
       case 'shadowBlade': {
         const dir = this.game.player.getForwardDirection();
-        this.skillEffects.spawnDashTrail(playerPos.clone(), dir, SKILLS.shadowBlade.range);
-        this.game.player.dashTo(SKILLS.shadowBlade.range, SKILLS.shadowBlade.duration);
+        const dashRange = finalRange || SKILLS.shadowBlade.range;
+        this.skillEffects.spawnDashTrail(playerPos.clone(), dir, dashRange, chargeLevel, this.game.player.mesh);
+        this.game.player.dashTo(dashRange, SKILLS.shadowBlade.duration);
         for (const enemy of this.enemies) {
           if (!enemy.isAlive()) continue;
           const toEnemy = enemy.mesh.position.subtract(playerPos);
           toEnemy.y = 0;
-          if (toEnemy.length() > SKILLS.shadowBlade.range) continue;
+          if (toEnemy.length() > dashRange) continue;
           if (Vector3.Dot(dir, toEnemy.normalize()) < 0.5) continue;
-          enemy.takeDamage(damage, false, playerPos);
+          const isCrit = comboBonus?.autoCrit ?? false;
+          enemy.takeDamage(finalDamage, isCrit, playerPos);
           this.game.damageNumbers.spawn(
-            enemy.mesh.position.add(new Vector3(0, 1.5, 0)), damage, 'skill',
+            enemy.mesh.position.add(new Vector3(0, 1.5, 0)), finalDamage, isCrit ? 'critical' : 'skill',
           );
         }
         break;
       }
-      case 'shadowShield':
+      case 'shadowShield': {
+        const shieldCharge = SKILL_CHARGE['shadowShield'];
+        const cv = shieldCharge ? shieldCharge[chargeLevel] : null;
+        const parryWindow = cv?.parryWindow ?? PARRY_CONFIG.defaultWindow;
+        const shieldDuration = cv?.duration ?? SKILLS.shadowShield.duration;
+        this.parrySystem.activateParry({
+          window: parryWindow,
+          stunDuration: PARRY_CONFIG.defaultStun,
+          reflectPercent: PARRY_CONFIG.defaultReflect,
+        });
         this.skillEffects.spawnShieldSphere(
-          () => this.game.player.getPosition(), SKILLS.shadowShield.duration,
+          () => this.game.player.getPosition(), shieldDuration, chargeLevel,
         );
         break;
-      case 'shadowBurst':
-        this.skillEffects.spawnBurstRing(playerPos.clone(), SKILLS.shadowBurst.range);
-        this.applyAoeDamage(playerPos, SKILLS.shadowBurst.range, damage);
+      }
+      case 'shadowBurst': {
+        const burstRange = finalRange || SKILLS.shadowBurst.range;
+        this.skillEffects.spawnBurstRing(playerPos.clone(), burstRange, chargeLevel);
+        this.applyAoeDamage(playerPos, burstRange, finalDamage);
+        if (chargeLevel === 'max') {
+          setTimeout(() => this.applyAoeDamage(playerPos, burstRange * 0.7, Math.round(finalDamage * 0.5)), 300);
+          setTimeout(() => this.applyAoeDamage(playerPos, burstRange * 0.5, Math.round(finalDamage * 0.3)), 600);
+        }
         break;
-      case 'sovereignAura':
-        this.skillEffects.spawnAuraWave(playerPos.clone(), SKILLS.sovereignAura.range);
-        this.applyAoeDamage(playerPos, SKILLS.sovereignAura.range, damage, (enemy) => {
+      }
+      case 'sovereignAura': {
+        const auraRange = finalRange || SKILLS.sovereignAura.range;
+        this.skillEffects.spawnAuraWave(playerPos.clone(), auraRange, chargeLevel);
+        this.applyAoeDamage(playerPos, auraRange, finalDamage, (enemy) => {
           enemy.applySlow(SKILLS.sovereignAura.slowMultiplier, SKILLS.sovereignAura.slowDuration);
         });
         break;
+      }
+
+      // ─── BOSS SKILLS (her skill kendi VFX'ini kullanir) ───
+      default: {
+        const bossDef = BOSS_SKILL_DEFS[skillId];
+        if (bossDef) {
+          const bossRange = bossDef.range ?? 5;
+          switch (skillId) {
+            case 'skill_flame_burst':
+              this.skillEffects.spawnFlameburst(playerPos.clone(), bossRange);
+              this.applyAoeDamage(playerPos, bossRange, finalDamage);
+              break;
+            case 'skill_lightning_chain':
+              this.skillEffects.spawnLightningChain(playerPos.clone(), bossRange);
+              this.applyAoeDamage(playerPos, bossRange, finalDamage);
+              break;
+            case 'skill_ice_prison':
+              this.skillEffects.spawnIcePrison(playerPos.clone(), bossDef.duration ?? 5);
+              break;
+            case 'skill_blood_rage':
+              this.skillEffects.spawnBloodRage(() => this.game.player.getPosition(), bossDef.duration ?? 8);
+              break;
+            case 'skill_shadow_domain':
+              this.skillEffects.spawnShadowDomain(playerPos.clone(), bossRange);
+              this.applyAoeDamage(playerPos, bossRange, finalDamage, (enemy) => {
+                if (bossDef.slowMultiplier && bossDef.slowDuration) {
+                  enemy.applySlow(bossDef.slowMultiplier, bossDef.slowDuration);
+                }
+              });
+              break;
+            case 'skill_void_strike': {
+              const dir = this.game.player.getForwardDirection();
+              const endPos = playerPos.add(dir.scale(bossRange));
+              this.skillEffects.spawnVoidStrike(playerPos.clone(), endPos, dir, bossRange);
+              this.game.player.dashTo(bossRange, bossDef.duration ?? 0.3);
+              for (const enemy of this.enemies) {
+                if (!enemy.isAlive()) continue;
+                const toEnemy = enemy.mesh.position.subtract(playerPos);
+                toEnemy.y = 0;
+                if (toEnemy.length() > bossRange) continue;
+                if (Vector3.Dot(dir, toEnemy.normalize()) < 0.5) continue;
+                enemy.takeDamage(finalDamage, false, playerPos);
+                this.game.damageNumbers.spawn(
+                  enemy.mesh.position.add(new Vector3(0, 1.5, 0)), finalDamage, 'skill',
+                );
+              }
+              break;
+            }
+            default:
+              switch (bossDef.type) {
+                case 'aoe':
+                  this.skillEffects.spawnBurstRing(playerPos.clone(), bossRange);
+                  this.applyAoeDamage(playerPos, bossRange, finalDamage);
+                  break;
+                case 'dash': {
+                  const dir = this.game.player.getForwardDirection();
+                  this.skillEffects.spawnDashTrail(playerPos.clone(), dir, bossRange);
+                  this.game.player.dashTo(bossRange, bossDef.duration ?? 0.3);
+                  break;
+                }
+                case 'buff':
+                  this.skillEffects.spawnShieldSphere(() => this.game.player.getPosition(), bossDef.duration ?? 5);
+                  break;
+                case 'ultimate':
+                  this.skillEffects.spawnAuraWave(playerPos.clone(), bossRange);
+                  this.applyAoeDamage(playerPos, bossRange, finalDamage);
+                  break;
+              }
+          }
+        }
+        break;
+      }
     }
     eventBus.emit('skill:hit', {
       skillId, damage,

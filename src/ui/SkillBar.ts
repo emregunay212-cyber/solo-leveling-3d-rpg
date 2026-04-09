@@ -1,4 +1,5 @@
 import type { SkillState } from '../skills/SkillDef';
+import type { ChargeLevel } from '../skills/ChargeSystem';
 
 /**
  * Skill bar UI — Solo Leveling temali Q/E/R/F slotlari.
@@ -10,6 +11,8 @@ export class SkillBar {
     cooldownOverlay: HTMLDivElement;
     cooldownText: HTMLSpanElement;
     upgradeBadge: HTMLSpanElement;
+    chargeBar: HTMLDivElement;
+    chargeFill: HTMLDivElement;
   }> = new Map();
 
   constructor() {
@@ -108,6 +111,30 @@ export class SkillBar {
           text-shadow: 0 0 4px rgba(251,191,36,0.6);
           display: none;
         }
+        .skill-slot.charging-tap  { border-color: rgba(150,70,255,0.7); }
+        .skill-slot.charging-lv1  { border-color: #FFD700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
+        .skill-slot.charging-max  { border-color: #FF4444; box-shadow: 0 0 14px rgba(255,68,68,0.7);
+                                    animation: chargePulse 0.3s ease-in-out infinite; }
+        .skill-slot.combo-ready   { box-shadow: 0 0 16px rgba(255,255,100,0.7), inset 0 0 8px rgba(255,255,0,0.15); }
+        @keyframes chargePulse {
+          0%,100% { box-shadow: 0 0 14px rgba(255,68,68,0.7); }
+          50%      { box-shadow: 0 0 22px rgba(255,68,68,1.0); }
+        }
+        .skill-charge-bar {
+          position: absolute;
+          bottom: 0; left: 0;
+          width: 100%; height: 3px;
+          background: rgba(255,255,255,0.1);
+          border-radius: 0 0 5px 5px;
+          overflow: hidden;
+          display: none;
+        }
+        .skill-charge-fill {
+          height: 100%;
+          width: 0%;
+          background: linear-gradient(90deg, #5B0E91, #B06EFF);
+          transition: width 0.05s linear, background 0.15s;
+        }
       </style>
     `;
 
@@ -126,6 +153,7 @@ export class SkillBar {
         <span class="skill-cost">${slot.def.mpCost}</span>
         <div class="skill-cd-overlay" id="scd-ov-${slot.def.id}"></div>
         <span class="skill-cd-text" id="scd-tx-${slot.def.id}"></span>
+        <div class="skill-charge-bar"><div class="skill-charge-fill"></div></div>
       `;
       this.container.appendChild(wrapper);
 
@@ -134,7 +162,94 @@ export class SkillBar {
         cooldownOverlay: wrapper.querySelector('.skill-cd-overlay') as HTMLDivElement,
         cooldownText: wrapper.querySelector('.skill-cd-text') as HTMLSpanElement,
         upgradeBadge: wrapper.querySelector('.skill-upgrade-badge') as HTMLSpanElement,
+        chargeBar: wrapper.querySelector('.skill-charge-bar') as HTMLDivElement,
+        chargeFill: wrapper.querySelector('.skill-charge-fill') as HTMLDivElement,
       });
+    }
+  }
+
+  /**
+   * Slotlar degistiginde UI'i yeniden olusturur.
+   * PlayerRankSystem'den gelen yetenek atamalari sonrasi cagirilir.
+   */
+  public refreshSlots(slots: readonly SkillState[]): void {
+    // Eski slot elementlerini temizle
+    for (const [, el] of this.slotElements) {
+      el.wrapper.remove();
+    }
+    this.slotElements.clear();
+
+    // Yeniden olustur
+    for (const slot of slots) {
+      const keyLabel = slot.def.key.replace('Key', '');
+      const wrapper = document.createElement('div');
+      wrapper.className = 'skill-slot';
+      wrapper.innerHTML = `
+        <span class="skill-key">${keyLabel}</span>
+        <span class="skill-upgrade-badge"></span>
+        <span class="skill-name">${slot.def.name}</span>
+        <span class="skill-cost">${slot.def.mpCost}</span>
+        <div class="skill-cd-overlay"></div>
+        <span class="skill-cd-text"></span>
+        <div class="skill-charge-bar"><div class="skill-charge-fill"></div></div>
+      `;
+      this.container.appendChild(wrapper);
+
+      this.slotElements.set(slot.def.id, {
+        wrapper,
+        cooldownOverlay: wrapper.querySelector('.skill-cd-overlay') as HTMLDivElement,
+        cooldownText: wrapper.querySelector('.skill-cd-text') as HTMLSpanElement,
+        upgradeBadge: wrapper.querySelector('.skill-upgrade-badge') as HTMLSpanElement,
+        chargeBar: wrapper.querySelector('.skill-charge-bar') as HTMLDivElement,
+        chargeFill: wrapper.querySelector('.skill-charge-fill') as HTMLDivElement,
+      });
+    }
+  }
+
+  /** Charge durumunu guncelle */
+  public updateCharge(
+    skillId: string,
+    chargeTime: number,
+    maxThreshold: number,
+    level: ChargeLevel | null,
+  ): void {
+    const el = this.slotElements.get(skillId);
+    if (!el) return;
+
+    if (!level) {
+      el.chargeBar.style.display = 'none';
+      el.wrapper.classList.remove('charging-tap', 'charging-lv1', 'charging-max');
+      return;
+    }
+
+    el.chargeBar.style.display = 'block';
+    const pct = Math.min(100, (chargeTime / maxThreshold) * 100);
+    el.chargeFill.style.width = `${pct}%`;
+
+    el.wrapper.classList.remove('charging-tap', 'charging-lv1', 'charging-max');
+    el.wrapper.classList.add(`charging-${level}`);
+
+    switch (level) {
+      case 'tap':
+        el.chargeFill.style.background = 'linear-gradient(90deg, #5B0E91, #B06EFF)';
+        break;
+      case 'lv1':
+        el.chargeFill.style.background = 'linear-gradient(90deg, #806000, #FFD700)';
+        break;
+      case 'max':
+        el.chargeFill.style.background = 'linear-gradient(90deg, #800000, #FF4444)';
+        break;
+    }
+  }
+
+  /** Combo penceresi actik combo yapilabilecek slotlari parlat */
+  public setComboHighlight(skillIds: string[], active: boolean): void {
+    for (const [id, el] of this.slotElements) {
+      if (active && skillIds.includes(id)) {
+        el.wrapper.classList.add('combo-ready');
+      } else {
+        el.wrapper.classList.remove('combo-ready');
+      }
     }
   }
 

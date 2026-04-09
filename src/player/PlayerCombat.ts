@@ -139,7 +139,13 @@ export class PlayerCombat {
     const attackerPos = this.player.getPosition();
     const damage = this.baseDamage * combo.damageMultiplier;
 
-    const hits = this.combatSystem.meleeAttack(attackerPos, attackDir, damage);
+    // 4. vuruş (comboIndex === 3): 360° AoE finisher
+    const stepDef = this.comboSystem.COMBO_STEPS[combo.comboIndex];
+    const aoeRadius = stepDef?.aoeRadius ?? 0;
+
+    const hits = aoeRadius > 0
+      ? this.combatSystem.aoeAttack(attackerPos, aoeRadius, damage)
+      : this.combatSystem.meleeAttack(attackerPos, attackDir, damage);
     this.lastHitCount = hits.length;
 
     for (const hit of hits) {
