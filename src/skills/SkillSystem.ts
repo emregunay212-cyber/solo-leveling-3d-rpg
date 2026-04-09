@@ -158,10 +158,13 @@ export class SkillSystem {
       // Tus birakildi → cast et
       if (!isDown && wasDown && cs.isCharging()) {
         const { level, chargeTime } = cs.release();
-        this.onChargeEnd?.();
+        // ÖNEMLİ: onChargeEnd cast'tan SONRA cagrilmali.
+        // Oncelikle cast yap (targeting position bu noktada hala aktif),
+        // ardından targeting/UI temizle.
         eventBus.emit('charge:release' as never, { skillId: slot.def.id, level } as never);
 
         const result = this.tryCast(slot, level, chargeTime, currentMp, statStr, statInt);
+        this.onChargeEnd?.(); // cast'tan sonra targeting deactivate
         this.keyWasDown.set(key, isDown);
         if (result) return result;
       }
