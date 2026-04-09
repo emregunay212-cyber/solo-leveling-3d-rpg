@@ -220,6 +220,7 @@ export class TestScene implements GameScene {
           this.targetingSystem.activate({
             mode: 'aoe_circle',
             minRadius: cfg.tap.range,
+            lv1Radius: cfg.lv1.range,
             maxRadius: cfg.max.range,
             maxRange: cfg.max.range * 1.5,
             color: new Color3(0.5, 0.2, 0.8),
@@ -228,6 +229,7 @@ export class TestScene implements GameScene {
           this.targetingSystem.activate({
             mode: 'direction_arrow',
             minRadius: cfg.tap.range,
+            lv1Radius: cfg.lv1.range,
             maxRadius: cfg.max.range,
             maxRange: cfg.max.range,
             color: new Color3(0.5, 0.2, 0.8),
@@ -1087,8 +1089,9 @@ export class TestScene implements GameScene {
       }
       case 'sovereignAura': {
         const auraRange = finalRange || SKILLS.sovereignAura.range;
-        this.skillEffects.spawnAuraWave(playerPos.clone(), auraRange, chargeLevel);
-        this.applyAoeDamage(playerPos, auraRange, finalDamage, (enemy) => {
+        const auraCenter = chargeLevel !== 'tap' ? targetPos : playerPos.clone();
+        this.skillEffects.spawnAuraWave(auraCenter, auraRange, chargeLevel);
+        this.applyAoeDamage(auraCenter, auraRange, finalDamage, (enemy) => {
           enemy.applySlow(SKILLS.sovereignAura.slowMultiplier ?? 0.5, SKILLS.sovereignAura.slowDuration ?? 3);
         });
         break;

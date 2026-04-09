@@ -17,6 +17,8 @@ export interface TargetingConfig {
   mode: TargetingMode;
   /** Tap anindaki radius */
   minRadius: number;
+  /** LV1 charge anindaki radius (verilmezse interpolasyon kullanilir) */
+  lv1Radius?: number;
   /** MAX charge anindaki radius */
   maxRadius: number;
   /** Maksimum menzil (fare bu mesafeden uzaktaysa snap'le) */
@@ -170,9 +172,15 @@ export class TargetingSystem {
     this._targetPosition = center.clone();
     this.aoeDisc.position.copyFrom(center);
 
-    // Charge seviyesine gore boyut
-    const t = chargeLevel === 'max' ? 1.0 : chargeLevel === 'lv1' ? 0.6 : 0.0;
-    const radius = cfg.minRadius + (cfg.maxRadius - cfg.minRadius) * t;
+    // Charge seviyesine gore boyut — kesin degerler kullan (lv1Radius varsa)
+    let radius: number;
+    if (chargeLevel === 'max') {
+      radius = cfg.maxRadius;
+    } else if (chargeLevel === 'lv1') {
+      radius = cfg.lv1Radius ?? (cfg.minRadius + (cfg.maxRadius - cfg.minRadius) * 0.6);
+    } else {
+      radius = cfg.minRadius;
+    }
     const scale = radius / cfg.minRadius;
     this.aoeDisc.scaling.setAll(scale);
 

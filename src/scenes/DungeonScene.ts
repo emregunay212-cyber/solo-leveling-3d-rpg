@@ -332,6 +332,16 @@ export class DungeonScene implements GameScene {
     this.updateArisePrompt();
     this.comboChainSystem.update(dt);
     this.parrySystem.update(dt);
+
+    // Targeting sistemi guncelle (charge sirasinda AoE dairesi)
+    if (this.activeChargeSkillId) {
+      const scene = this.game.engine.scene;
+      const pick = scene.pick(scene.pointerX, scene.pointerY, (m) => m.name === 'ground');
+      const mouseWorld = pick?.hit && pick.pickedPoint
+        ? pick.pickedPoint.clone()
+        : this.game.player.getPosition().add(new Vector3(0, 0, 3));
+      this.targetingSystem.update(dt, this.game.player.getPosition(), mouseWorld, this.activeChargeLevel ?? 'tap');
+    }
     this.game.hud.setBlocking(ctx.player.isBlocking);
     this.updateHUD();
   }
@@ -606,6 +616,30 @@ export class DungeonScene implements GameScene {
       this.activeChargeSkillId = skillId;
       this.activeChargeLevel = 'tap';
       this.game.player.setMoveSpeedMultiplier(0.4);
+      const skillDef = this.skillSystem.getSlots().find(s => s.def.id === skillId)?.def;
+      const cfg = SKILL_CHARGE[skillId];
+      if (skillDef && cfg) {
+        if (skillDef.type === 'aoe' || skillDef.type === 'ultimate') {
+          this.targetingSystem.activate({
+            mode: 'aoe_circle',
+            minRadius: cfg.tap.range,
+            lv1Radius: cfg.lv1.range,
+            maxRadius: cfg.max.range,
+            maxRange: cfg.max.range * 1.5,
+            color: new Color3(0.5, 0.2, 0.8),
+          });
+        } else if (skillDef.type === 'dash') {
+          this.targetingSystem.activate({
+            mode: 'direction_arrow',
+            minRadius: cfg.tap.range,
+            lv1Radius: cfg.lv1.range,
+            maxRadius: cfg.max.range,
+            maxRange: cfg.max.range,
+            color: new Color3(0.5, 0.2, 0.8),
+          });
+        }
+        this.targetingUI.show(skillDef.name);
+      }
     });
     this.skillSystem.setOnChargeLevel((level, skillId) => {
       this.activeChargeLevel = level;
@@ -618,6 +652,7 @@ export class DungeonScene implements GameScene {
       this.activeChargeSkillId = null;
       this.activeChargeLevel = null;
       this.game.player.setMoveSpeedMultiplier(1.0);
+      this.targetingUI.hide();
     });
 
     // Shadow systems — Game uzerinden paylasilan varsa kullan
@@ -1239,6 +1274,11 @@ export class DungeonScene implements GameScene {
       this.comboUI.showComboName(comboBonus.link.name);
     }
 
+    // Targeting sisteminden hedef pozisyonu al
+    const targetPos = this.targetingSystem.isActive()
+      ? this.targetingSystem.getTargetPosition()
+      : playerPos.clone();
+
     switch (skillId) {
       case 'shadowBlade': {
         const dir = this.game.player.getForwardDirection();
@@ -1276,18 +1316,20 @@ export class DungeonScene implements GameScene {
       }
       case 'shadowBurst': {
         const burstRange = finalRange || SKILLS.shadowBurst.range;
-        this.skillEffects.spawnBurstRing(playerPos.clone(), burstRange, chargeLevel);
-        this.applyAoeDamage(playerPos, burstRange, finalDamage);
+        const burstCenter = chargeLevel !== 'tap' ? targetPos : playerPos.clone();
+        this.skillEffects.spawnBurstRing(burstCenter, burstRange, chargeLevel);
+        this.applyAoeDamage(burstCenter, burstRange, finalDamage);
         if (chargeLevel === 'max') {
-          setTimeout(() => this.applyAoeDamage(playerPos, burstRange * 0.7, Math.round(finalDamage * 0.5)), 300);
-          setTimeout(() => this.applyAoeDamage(playerPos, burstRange * 0.5, Math.round(finalDamage * 0.3)), 600);
+          setTimeout(() => this.applyAoeDamage(burstCenter, burstRange * 0.7, Math.round(finalDamage * 0.5)), 300);
+          setTimeout(() => this.applyAoeDamage(burstCenter, burstRange * 0.5, Math.round(finalDamage * 0.3)), 600);
         }
         break;
       }
       case 'sovereignAura': {
         const auraRange = finalRange || SKILLS.sovereignAura.range;
-        this.skillEffects.spawnAuraWave(playerPos.clone(), auraRange, chargeLevel);
-        this.applyAoeDamage(playerPos, auraRange, finalDamage, (enemy) => {
+        const auraCenter = chargeLevel !== 'tap' ? targetPos : playerPos.clone();
+        this.skillEffects.spawnAuraWave(auraCenter, auraRange, chargeLevel);
+        this.applyAoeDamage(auraCenter, auraRange, finalDamage, (enemy) => {
           enemy.applySlow(SKILLS.sovereignAura.slowMultiplier, SKILLS.sovereignAura.slowDuration);
         });
         break;
