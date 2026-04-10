@@ -1,6 +1,7 @@
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { CombatSystem } from '../combat/CombatSystem';
 import { ENEMY_AI } from '../config/GameConfig';
+import { SafeZoneRegistry } from '../systems/SafeZone';
 import type { Enemy } from './Enemy';
 
 export enum AIState {
@@ -67,6 +68,10 @@ export class EnemyAI {
     this.lastPlayerPos.copyFrom(playerPos);
     if (this.state === AIState.DEAD) return;
 
+    // Oyuncu safe zone icindeyse saldirilmaz — olu gibi davran
+    const playerInSafeZone = SafeZoneRegistry.isPositionSafe(playerPos);
+    const effectivePlayerAlive = playerAlive && !playerInSafeZone;
+
     this.attackTimer = Math.max(0, this.attackTimer - dt);
 
     // Tehdit varsa (golge askeri hasar verdiyse) → threat pozisyonuna yonel
@@ -89,19 +94,19 @@ export class EnemyAI {
 
     switch (this.state) {
       case AIState.IDLE:
-        this.updateIdle(dt, distToTarget, distToPlayer, playerAlive);
+        this.updateIdle(dt, distToTarget, distToPlayer, effectivePlayerAlive);
         break;
       case AIState.PATROL:
-        this.updatePatrol(dt, distToTarget, distToPlayer, playerAlive);
+        this.updatePatrol(dt, distToTarget, distToPlayer, effectivePlayerAlive);
         break;
       case AIState.CHASE:
-        this.updateChase(dt, toTarget, distToTarget, distToSpawn, playerAlive);
+        this.updateChase(dt, toTarget, distToTarget, distToSpawn, effectivePlayerAlive);
         break;
       case AIState.ATTACK:
-        this.updateAttack(dt, toTarget, distToTarget, playerAlive);
+        this.updateAttack(dt, toTarget, distToTarget, effectivePlayerAlive);
         break;
       case AIState.RETURN:
-        this.updateReturn(dt, toSpawn, distToSpawn, distToPlayer, playerAlive);
+        this.updateReturn(dt, toSpawn, distToSpawn, distToPlayer, effectivePlayerAlive);
         break;
     }
   }
