@@ -6,7 +6,7 @@ import type { SkillDef } from './SkillDef';
  * GameConfig'ten degerler alinir.
  */
 export const SKILL_LIST: readonly SkillDef[] = [
-  SKILLS.shadowBlade,
+  SKILLS.phantomStrike,
   SKILLS.shadowShield,
   SKILLS.shadowBurst,
   SKILLS.sovereignAura,

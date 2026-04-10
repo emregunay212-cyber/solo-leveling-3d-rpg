@@ -26,11 +26,11 @@ describe('SkillSystem', () => {
     expect(system.getSlots()).toHaveLength(4);
   });
 
-  it('Q basilinca shadowBlade cast etmeli', () => {
+  it('Q basilinca phantomStrike cast etmeli', () => {
     input.pressKey('KeyQ');
     const result = system.update(0.016, 100, 10, 10);
     expect(result).not.toBeNull();
-    expect(result!.skill.id).toBe('shadowBlade');
+    expect(result!.skill.id).toBe('phantomStrike');
   });
 
   it('MP yetersizse cast etmemeli', () => {
@@ -54,7 +54,7 @@ describe('SkillSystem', () => {
     system.update(0.016, 100, 10, 10);
     input.releaseKey('KeyQ');
     // Cooldown bitmesini bekle
-    system.update(SKILLS.shadowBlade.cooldown + 0.1, 100, 10, 10);
+    system.update(SKILLS.phantomStrike.cooldown + 0.1, 100, 10, 10);
     input.pressKey('KeyQ');
     const result = system.update(0.016, 100, 10, 10);
     expect(result).not.toBeNull();
@@ -77,11 +77,11 @@ describe('SkillSystem', () => {
     expect(system.getShieldReduction()).toBe(0);
   });
 
-  it('hasar STR bazli hesaplanmali (shadowBlade)', () => {
+  it('hasar STR bazli hesaplanmali (phantomStrike)', () => {
     input.pressKey('KeyQ');
     const result = system.update(0.016, 100, 20, 5); // STR=20
     expect(result).not.toBeNull();
-    expect(result!.damage).toBe(Math.round(20 * SKILLS.shadowBlade.damageMultiplier));
+    expect(result!.damage).toBe(Math.round(20 * SKILLS.phantomStrike.damageMultiplier));
   });
 
   it('hasar INT bazli hesaplanmali (shadowBurst)', () => {

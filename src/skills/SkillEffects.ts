@@ -13,6 +13,7 @@ import { Scene } from '@babylonjs/core/scene';
 import type { SkillVFXManager } from '../vfx/SkillVFXManager';
 import type { ChargeLevel } from '../skills/ChargeSystem';
 import { playDashTrailVFX } from '../vfx/skills/DashTrailVFX';
+import { playPhantomStrikeVFX } from '../vfx/skills/PhantomStrikeVFX';
 import { playShieldVFX } from '../vfx/skills/ShieldVFX';
 import { playBurstVFX } from '../vfx/skills/BurstVFX';
 import { playAuraVFX } from '../vfx/skills/AuraVFX';
@@ -74,6 +75,20 @@ export class SkillEffects {
       return;
     }
     this.fallbackDashTrail(startPos, direction, distance);
+  }
+
+  /** Q — Fantom Saldiri (coklu vurus) */
+  public spawnPhantomStrike(
+    playerPos: Vector3,
+    direction: Vector3,
+    hitCount: number,
+    chargeLevel: ChargeLevel = 'tap',
+  ): void {
+    if (this.vfxManager) {
+      playPhantomStrikeVFX(this.vfxManager, this.scene, playerPos, direction, hitCount, chargeLevel);
+      return;
+    }
+    this.fallbackPhantomStrike(playerPos, direction, hitCount);
   }
 
   /** E — Golge Kalkani */
@@ -234,6 +249,29 @@ export class SkillEffects {
     mat.backFaceCulling = false;
     mat.disableLighting = true;
     return mat;
+  }
+
+  private fallbackPhantomStrike(center: Vector3, direction: Vector3, hitCount: number): void {
+    for (let i = 0; i < hitCount; i++) {
+      setTimeout(() => {
+        const angle = Math.atan2(direction.x, direction.z) + (i % 2 === 0 ? 0.4 : -0.4);
+        const slash = MeshBuilder.CreatePlane(`fx_phantom_${i}`, { width: 1.5, height: 0.08 }, this.scene);
+        slash.position = center.clone();
+        slash.position.y += 0.8 + (i % 3) * 0.3;
+        slash.rotation.y = angle;
+        slash.isPickable = false;
+        const mat = this.makeMat(`fx_phantom_m_${i}`, new Color3(0.5, 0.1, 0.9), new Color3(0.7, 0.3, 1.0), 0.8);
+        slash.material = mat;
+
+        this.effects.push({
+          meshes: [slash], mats: [mat], timer: 0.2, maxTime: 0.2,
+          update: (t) => {
+            slash.scaling.x = 0.3 + t * 1.2;
+            mat.alpha = 0.8 * (1 - t);
+          },
+        });
+      }, i * 80);
+    }
   }
 
   private fallbackDashTrail(startPos: Vector3, direction: Vector3, distance: number): void {

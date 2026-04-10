@@ -30,10 +30,10 @@ export interface ComboBonus {
 }
 
 const COMBO_LINKS: ComboLink[] = [
-  { from: 'shadowBlade',  to: 'shadowBurst',  name: 'Golge Kesisimi',   bonusType: 'damage',       bonusValue: 0.30 },
-  { from: 'shadowBurst',  to: 'shadowBlade',  name: 'Patlama Kacisi',   bonusType: 'cooldown_free', bonusValue: 0.0  },
+  { from: 'phantomStrike',  to: 'shadowBurst',  name: 'Golge Kesisimi',   bonusType: 'damage',       bonusValue: 0.30 },
+  { from: 'shadowBurst',  to: 'phantomStrike',  name: 'Patlama Kacisi',   bonusType: 'cooldown_free', bonusValue: 0.0  },
   { from: 'sovereignAura',to: 'shadowBurst',  name: 'Hukumdar Gazabi',  bonusType: 'aoe_double',   bonusValue: 2.0  },
-  { from: 'shadowBlade',  to: 'normal',        name: 'Momentum',         bonusType: 'instant',      bonusValue: 1.0  },
+  { from: 'phantomStrike',  to: 'normal',        name: 'Momentum',         bonusType: 'instant',      bonusValue: 1.0  },
 
   // Boss drop combo'lari
   { from: 'skill_flame_burst',    to: 'skill_lightning_chain', name: 'Firtina Atesi',  bonusType: 'damage',    bonusValue: 0.50 },

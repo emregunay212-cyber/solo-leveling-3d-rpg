@@ -1038,26 +1038,65 @@ export class TestScene implements GameScene {
       : playerPos.clone();
 
     switch (skillId) {
-      case 'shadowBlade': {
+      case 'phantomStrike': {
         const dir = this.game.player.getForwardDirection();
-        const dashRange = finalRange || SKILLS.shadowBlade.range;
-        this.skillEffects.spawnDashTrail(
-          playerPos.clone(), dir, dashRange,
-          chargeLevel, this.game.player.mesh,
-        );
-        this.game.player.dashTo(dashRange, SKILLS.shadowBlade.duration);
-        // Koni icindeki dusmanlara hasar
+        const strikeRange = finalRange || SKILLS.phantomStrike.range;
+        // Charge seviyesinden vurus sayisi: tap=3, lv1=5, max=7
+        const hitCount = chargeLevel === 'max' ? 7 : chargeLevel === 'lv1' ? 5 : 3;
+        // Koni acisi: tap=90°, lv1=120°, max=150°
+        const coneHalf = chargeLevel === 'max' ? Math.PI * 5 / 12
+          : chargeLevel === 'lv1' ? Math.PI / 3
+          : Math.PI / 4;
+        const coneDot = Math.cos(coneHalf);
+
+        // VFX
+        this.skillEffects.spawnPhantomStrike(playerPos.clone(), dir, hitCount, chargeLevel);
+
+        // Koni icindeki dusmanlari bul
+        const targets: Enemy[] = [];
         for (const enemy of this.enemies) {
           if (!enemy.isAlive()) continue;
-          const toEnemy = enemy.mesh.position.subtract(playerPos);
+          const toEnemy = enemy.position.subtract(playerPos);
           toEnemy.y = 0;
-          if (toEnemy.length() > dashRange) continue;
-          if (Vector3.Dot(dir, toEnemy.normalize()) < 0.5) continue;
-          const isCrit = comboBonus?.autoCrit ?? false;
-          enemy.takeDamage(finalDamage, isCrit, playerPos);
-          this.game.damageNumbers.spawn(
-            enemy.mesh.position.add(new Vector3(0, 1.5, 0)), finalDamage, isCrit ? 'critical' : 'skill',
-          );
+          const dist = toEnemy.length();
+          if (dist > strikeRange + 0.35 * enemy.def.scale) continue;
+          if (dist > 0.01 && Vector3.Dot(dir, toEnemy.normalize()) < coneDot) continue;
+          targets.push(enemy);
+        }
+
+        // Her vurus icin ardisik hasar
+        const perHitDmg = Math.round(finalDamage / hitCount * 1.5);
+        const isCrit = comboBonus?.autoCrit ?? false;
+        const hitDelay = 80;
+
+        for (let i = 0; i < hitCount; i++) {
+          const isFinal = i === hitCount - 1;
+          setTimeout(() => {
+            for (const enemy of targets) {
+              if (!enemy.isAlive()) continue;
+              const dmg = isFinal ? Math.round(perHitDmg * 1.5) : perHitDmg;
+              enemy.takeDamage(dmg, isCrit && isFinal, playerPos);
+              this.game.damageNumbers.spawn(
+                enemy.mesh.position.add(new Vector3(0, 1.5 + (i % 3) * 0.3, 0)),
+                dmg, isCrit && isFinal ? 'critical' : 'skill',
+              );
+            }
+            // MAX son vurus: AoE patlama (yakin dusmanlara ekstra hasar)
+            if (isFinal && chargeLevel === 'max') {
+              this.applyAoeDamage(playerPos, strikeRange * 1.5, Math.round(finalDamage * 0.3));
+            }
+            // LV1+ son vurus: knockback
+            if (isFinal && chargeLevel !== 'tap') {
+              for (const enemy of targets) {
+                if (!enemy.isAlive()) continue;
+                const kb = enemy.position.subtract(playerPos);
+                kb.y = 0;
+                if (kb.length() > 0.01) {
+                  enemy.position.addInPlace(kb.normalize().scale(1.5));
+                }
+              }
+            }
+          }, i * hitDelay);
         }
         break;
       }
@@ -1273,7 +1312,7 @@ export class TestScene implements GameScene {
 
     // Varsayilan skill tanimlari (baslangic yetenekleri)
     const defaultSkills: Record<string, import('../skills/SkillDef').SkillDef> = {
-      KeyQ: SKILLS.shadowBlade,
+      KeyQ: SKILLS.phantomStrike,
       KeyE: SKILLS.shadowShield,
       KeyR: SKILLS.shadowBurst,
       KeyF: SKILLS.sovereignAura,
