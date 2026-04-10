@@ -194,7 +194,7 @@ export const SKILLS = {
     mpCost: 15,
     cooldown: 4,
     duration: 0.4,
-    range: 3,
+    range: 5,
     damageMultiplier: 1.0,
     scaleStat: 'str' as const,
     type: 'dash' as const,
@@ -347,9 +347,9 @@ export const SKILL_CHARGE: Record<string, import('../skills/SkillDef').SkillChar
   phantomStrike: {
     lv1Threshold: 0.3, maxThreshold: 2.0,
     canMoveWhileCharging: true, moveSpeedMultiplier: 0.5,
-    tap:  { range: 3, damageMult: 1.0, mpCost: 15, extra: 'hits:3' },
-    lv1:  { range: 4, damageMult: 1.2, mpCost: 22, extra: 'hits:5,knockback' },
-    max:  { range: 5, damageMult: 1.5, mpCost: 35, extra: 'hits:7,aoe_burst,slowmo' },
+    tap:  { range: 5, damageMult: 1.0, mpCost: 15, extra: 'hits:3' },
+    lv1:  { range: 7, damageMult: 1.2, mpCost: 22, extra: 'hits:5,knockback' },
+    max:  { range: 9, damageMult: 1.5, mpCost: 35, extra: 'hits:7,aoe_burst,slowmo' },
   },
   shadowShield: {
     lv1Threshold: 0.3, maxThreshold: 2.0,
