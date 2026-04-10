@@ -1000,9 +1000,13 @@ export class TestScene implements GameScene {
     let hitCount = 0;
     for (const enemy of this.enemies) {
       if (!enemy.isAlive()) continue;
-      const toEnemy = enemy.mesh.position.subtract(center);
-      toEnemy.y = 0;
-      if (toEnemy.length() > range) continue;
+      // Dusman pozisyonunu kullan (mesh.position Y-offsetli, position gercek zemin pos)
+      const dx = enemy.position.x - center.x;
+      const dz = enemy.position.z - center.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      // Dusman govde yaricapini hesaba kat — daire kenarindaki dusmanlar da hasar almali
+      const enemyRadius = 0.35 * enemy.def.scale;
+      if (dist - enemyRadius > range) continue;
       enemy.takeDamage(damage, false, center);
       this.game.damageNumbers.spawn(
         enemy.mesh.position.add(new Vector3(0, 1.5, 0)), damage, 'skill',
