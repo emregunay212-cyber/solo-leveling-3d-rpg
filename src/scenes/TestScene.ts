@@ -227,12 +227,15 @@ export class TestScene implements GameScene {
           });
         } else if (skillDef.type === 'dash') {
           this.targetingSystem.activate({
-            mode: 'direction_arrow',
+            mode: 'direction_cone',
             minRadius: cfg.tap.range,
             lv1Radius: cfg.lv1.range,
             maxRadius: cfg.max.range,
             maxRange: cfg.max.range,
             color: new Color3(0.5, 0.2, 0.8),
+            minConeAngle: Math.PI / 2,
+            lv1ConeAngle: Math.PI * 2 / 3,
+            maxConeAngle: Math.PI * 5 / 6,
           });
         }
         this.targetingUI.show(skillDef.name);

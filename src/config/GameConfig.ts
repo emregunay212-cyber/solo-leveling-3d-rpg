@@ -32,15 +32,15 @@ export const CAMERA = {
 
 // ─── SAVAS ───
 export const COMBAT = {
-  attackRange: 4.0,
-  attackAngle: Math.PI * 0.5,       // 90° koni
+  attackRange: 2.0,
+  attackAngle: Math.PI / 4,         // 45° yarım koni (toplam 90°)
   critChance: 0.15,
   critMultiplier: 2.0,
   damageVarianceMin: 0.85,
   damageVarianceRange: 0.3,         // 85%-115%
   facingHalfAngle: Math.PI / 3,     // 60° her yana
   behindDotThreshold: -0.3,
-  autoAttackRange: 3.5,
+  autoAttackRange: 2.0,
   basePlayerDamage: 25,
   doubleClickTime: 0.4,
   backstabMultiplier: 1.5,

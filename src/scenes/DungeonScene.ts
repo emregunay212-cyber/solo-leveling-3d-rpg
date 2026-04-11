@@ -280,7 +280,7 @@ export class DungeonScene implements GameScene {
         dt, this.playerMp, this.levelSystem.str, this.levelSystem.int,
       );
       if (castResult) {
-        this.playerMp = Math.max(0, this.playerMp - castResult.skill.mpCost);
+        this.playerMp = Math.max(0, this.playerMp - castResult.mpCost);
       }
     }
 
@@ -628,31 +628,47 @@ export class DungeonScene implements GameScene {
             maxRange: cfg.max.range * 1.5,
             color: new Color3(0.5, 0.2, 0.8),
           });
+          this.targetingUI.show(skillDef.name);
         } else if (skillDef.type === 'dash') {
           this.targetingSystem.activate({
-            mode: 'direction_arrow',
+            mode: 'direction_cone',
             minRadius: cfg.tap.range,
             lv1Radius: cfg.lv1.range,
             maxRadius: cfg.max.range,
             maxRange: cfg.max.range,
             color: new Color3(0.5, 0.2, 0.8),
+            minConeAngle: Math.PI / 2,
+            lv1ConeAngle: Math.PI * 2 / 3,
+            maxConeAngle: Math.PI * 5 / 6,
           });
+          this.targetingUI.show(skillDef.name);
         }
-        this.targetingUI.show(skillDef.name);
+        // buff/shield tipleri icin targeting gosterilmez
       }
     });
     this.skillSystem.setOnChargeLevel((level, skillId) => {
       this.activeChargeLevel = level;
+      const cfg = SKILL_CHARGE[skillId];
+      if (cfg) {
+        this.targetingUI.update(
+          this.skillSystem.getChargeState(
+            this.skillSystem.getSlots().find(s => s.def.id === skillId)?.def.key ?? ''
+          )?.chargeTime ?? 0,
+          cfg.maxThreshold,
+          level,
+        );
+      }
       this.skillBar.updateCharge(skillId, 0, 1, level);
     });
     this.skillSystem.setOnChargeEnd(() => {
+      this.targetingSystem.deactivate();
+      this.targetingUI.hide();
       if (this.activeChargeSkillId) {
         this.skillBar.updateCharge(this.activeChargeSkillId, 0, 1, null);
       }
       this.activeChargeSkillId = null;
       this.activeChargeLevel = null;
       this.game.player.setMoveSpeedMultiplier(1.0);
-      this.targetingUI.hide();
     });
 
     // Shadow systems — Game uzerinden paylasilan varsa kullan
