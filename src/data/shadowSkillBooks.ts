@@ -518,7 +518,7 @@ export const BOSS_SKILL_DEFS: Readonly<Record<string, SkillDef>> = {
 
 /** Hangi kitap hangi oyuncu yetenegini guclendirir (upgrade kitaplari) */
 export const BOOK_TO_SKILL_MAP: Readonly<Record<string, string>> = {
-  'book_shadow_blade_up': 'shadowBlade',
+  'book_shadow_blade_up': 'phantomStrike',
   'book_shadow_shield_up': 'shadowShield',
   'book_shadow_burst_up': 'shadowBurst',
   'book_sovereign_aura_up': 'sovereignAura',
@@ -548,7 +548,7 @@ export const BOSS_SKILL_BOOK_IDS = new Set([
 
 /** Skill ID → skill display bilgisi (UI icin) */
 export const SKILL_KEY_LABELS: Readonly<Record<string, string>> = {
-  'shadowBlade': 'Q',
+  'phantomStrike': 'Q',
   'shadowShield': 'E',
   'shadowBurst': 'R',
   'sovereignAura': 'F',

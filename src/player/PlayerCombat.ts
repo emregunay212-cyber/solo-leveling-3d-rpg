@@ -134,6 +134,9 @@ export class PlayerCombat {
     const combo = this.comboSystem.tryAttack();
     if (!combo) return;
 
+    // Play attack animation
+    this.player.animator.playAttack(combo.comboIndex, this.comboSystem.getAttackSpeed());
+
     const rotation = this.player.mesh.rotation.y;
     const attackDir = new Vector3(Math.sin(rotation), 0, Math.cos(rotation));
     const attackerPos = this.player.getPosition();

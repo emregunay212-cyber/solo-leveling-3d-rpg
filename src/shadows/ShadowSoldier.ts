@@ -187,8 +187,11 @@ export class ShadowSoldier {
       if (periodicAoe.damage > 0 && periodicAoe.aoeRadius > 0) {
         for (const enemy of enemies) {
           if (!enemy.isAlive()) continue;
-          const dist = enemy.mesh.position.subtract(this.position).length();
-          if (dist <= periodicAoe.aoeRadius) {
+          const dx = enemy.position.x - this.position.x;
+          const dz = enemy.position.z - this.position.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          const enemyRadius = 0.35 * enemy.def.scale;
+          if (dist - enemyRadius <= periodicAoe.aoeRadius) {
             enemy.takeDamage(periodicAoe.damage, false, this.position, true);
             if (this.damageNumbers) {
               this.damageNumbers.spawn(

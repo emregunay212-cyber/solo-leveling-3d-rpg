@@ -200,8 +200,9 @@ export class SkillSystem {
     // Cooldown kontrol
     if (slot.cooldownRemaining > 0) return null;
 
-    // Charge degerlerini al
-    const cv = getChargeValues(slot.def, level);
+    // Charge degerlerini al — SKILL_CHARGE'dan (def.charge yoksa fallback)
+    const chargeCfg = SKILL_CHARGE[slot.def.id];
+    const cv = chargeCfg ? chargeCfg[level] : getChargeValues(slot.def, level);
     const mpCost = cv.mpCost;
 
     // MP kontrol

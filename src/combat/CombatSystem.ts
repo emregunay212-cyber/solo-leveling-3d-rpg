@@ -127,11 +127,14 @@ export class CombatSystem {
   ): { target: Damageable; damage: number; isCritical: boolean }[] {
     const hits: { target: Damageable; damage: number; isCritical: boolean }[] = [];
 
+    // Govde yaricapi toleransi — kenar dusmanlarini kacirma
+    const HIT_TOLERANCE = 0.5;
+
     for (const target of this.targets) {
       if (!target.isAlive()) continue;
       const toTarget = target.mesh.position.subtract(center);
       toTarget.y = 0;
-      if (toTarget.length() > radius) continue;
+      if (toTarget.length() > radius + HIT_TOLERANCE) continue;
 
       const isCritical = Math.random() < this.CRIT_CHANCE;
       const critMultiplier = isCritical ? COMBAT.critMultiplier : 1.0;

@@ -5,12 +5,16 @@ import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { Scene } from '@babylonjs/core/scene';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
+import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import { Ray } from '@babylonjs/core/Culling/ray';
+import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
+import '@babylonjs/loaders/glTF';
 import {
   PhysicsCharacterController,
 } from '@babylonjs/core/Physics/v2/characterController';
 import { InputManager } from '../core/InputManager';
 import { PlayerCamera } from './PlayerCamera';
+import { PlayerAnimator } from './PlayerAnimator';
 import { PLAYER } from '../config/GameConfig';
 
 /**
@@ -24,10 +28,15 @@ export class PlayerController {
   public root: TransformNode;
   public mesh: Mesh;
   public characterController: PhysicsCharacterController;
+  public animator: PlayerAnimator;
 
   private input: InputManager;
   private camera!: PlayerCamera;
   private scene: Scene;
+
+  // Loaded model meshes (for raypick exclusion)
+  private modelMeshes: AbstractMesh[] = [];
+  private modelLoaded = false;
 
   // Tuning (from GameConfig)
   private readonly WALK_SPEED = PLAYER.walkSpeed;
@@ -53,6 +62,7 @@ export class PlayerController {
   constructor(scene: Scene, input: InputManager, camera: PlayerCamera | null) {
     this.scene = scene;
     this.input = input;
+    this.animator = new PlayerAnimator();
     if (camera) this.camera = camera;
 
     this.root = new TransformNode('playerRoot', scene);
@@ -69,6 +79,9 @@ export class PlayerController {
     );
 
     this.mesh.position.copyFrom(startPos);
+
+    // Load the real character model
+    this.loadCharacterModel();
   }
 
   private createTempMesh(): Mesh {
@@ -79,8 +92,49 @@ export class PlayerController {
     mat.diffuseColor = new Color3(0.2, 0.15, 0.4);
     mat.specularColor = new Color3(0.3, 0.2, 0.5);
     body.material = mat;
+    body.isVisible = true; // visible until model loads
     this.mat = mat;
     return body;
+  }
+
+  private async loadCharacterModel(): Promise<void> {
+    try {
+      const result = await SceneLoader.ImportMeshAsync(
+        '', '/models/', 'jinwoo_character.glb', this.scene
+      );
+
+      // Wrapper: flip 180° on Y and fix X rotation for Z-up model
+      const modelPivot = new TransformNode('modelPivot', this.scene);
+      modelPivot.parent = this.mesh;
+      modelPivot.rotation.y = Math.PI;
+
+      const glbRoot = result.meshes[0];
+      glbRoot.parent = modelPivot;
+      const MODEL_SCALE = this.PLAYER_HEIGHT / 1.4;
+      glbRoot.scaling.setAll(MODEL_SCALE);
+      glbRoot.position.set(0, 0.3, 0);
+
+      for (const m of result.meshes) {
+        m.isPickable = false;
+        // Disable frustum culling — scaled model's bounding box is wrong,
+        // causing it to disappear when camera rotates
+        m.alwaysSelectAsActiveMesh = true;
+        this.modelMeshes.push(m);
+      }
+
+      // Hide the capsule
+      this.mesh.isVisible = false;
+
+      // Register animations
+      if (result.animationGroups.length > 0) {
+        this.animator.registerAnimations(result.animationGroups);
+        this.animator.startIdle();
+      }
+
+      this.modelLoaded = true;
+    } catch (_err) {
+      // Model failed to load — keep capsule placeholder
+    }
   }
 
   public update(dt: number): void {
@@ -105,6 +159,11 @@ export class PlayerController {
     this.updateRotation();
     this.root.position.copyFrom(this.mesh.position);
     this.camera.update();
+
+    // Update animation state based on movement
+    if (this.modelLoaded) {
+      this.animator.updateMovement(speed, this.input.isSprinting(), this.isBlockingState);
+    }
   }
 
   private updateBlockState(): void {
@@ -177,7 +236,7 @@ export class PlayerController {
     const origin = new Vector3(pos.x, feetY, pos.z);
     const ray = new Ray(origin, Vector3.Down(), 50);
     const hit = this.scene.pickWithRay(ray, (m) => {
-      return m !== this.mesh && m.isPickable && m.isEnabled();
+      return m !== this.mesh && !this.modelMeshes.includes(m) && m.isPickable && m.isEnabled();
     });
     if (hit?.hit && hit.pickedPoint) {
       if (hit.getNormal) {
@@ -234,6 +293,9 @@ export class PlayerController {
     this.dashTimer = duration;
     this.isDashing = true;
     this.autoMoveTarget = null;
+    if (this.modelLoaded) {
+      this.animator.play('dash');
+    }
   }
 
   public getIsDashing(): boolean { return this.isDashing; }
@@ -244,6 +306,10 @@ export class PlayerController {
   }
 
   public dispose(): void {
+    this.animator.dispose();
+    for (const m of this.modelMeshes) {
+      m.dispose();
+    }
     this.mesh.dispose();
     this.characterController.dispose();
     this.root.dispose();
