@@ -100,19 +100,20 @@ export class PlayerController {
   private async loadCharacterModel(): Promise<void> {
     try {
       const result = await SceneLoader.ImportMeshAsync(
-        '', '/models/', 'jinwoo_character.glb', this.scene
+        '', '/models/', 'ninja_character.glb', this.scene
       );
 
-      // Wrapper: flip 180° on Y and fix X rotation for Z-up model
+      // KayKit model faces +Z by default, no flip needed
       const modelPivot = new TransformNode('modelPivot', this.scene);
       modelPivot.parent = this.mesh;
-      modelPivot.rotation.y = Math.PI;
+      modelPivot.rotation.y = 0;
 
       const glbRoot = result.meshes[0];
       glbRoot.parent = modelPivot;
-      const MODEL_SCALE = this.PLAYER_HEIGHT / 1.4;
-      glbRoot.scaling.setAll(MODEL_SCALE);
-      glbRoot.position.set(0, 0.3, 0);
+      // KayKit Rogue_Hooded: ~1.4 unit tall, scale to compact/hobbit size
+      const MODEL_SCALE = (this.PLAYER_HEIGHT * 0.55) / 1.4;
+      modelPivot.scaling.setAll(MODEL_SCALE);
+      modelPivot.position.y = -this.PLAYER_HEIGHT / 2 + 0.05;
 
       for (const m of result.meshes) {
         m.isPickable = false;

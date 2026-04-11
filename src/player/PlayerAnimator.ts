@@ -97,8 +97,14 @@ export class PlayerAnimator {
 
   /** Update animation based on movement state */
   public updateMovement(speed: number, isSprinting: boolean, isBlocking: boolean): void {
-    // Don't interrupt one-shot animations
-    if (this.isPlayingOneShot()) return;
+    // Movement cancels attack/one-shot animations (except death)
+    if (this.isPlayingOneShot()) {
+      if (speed > 0.1 && this.currentState !== 'death') {
+        this.cancelCurrentAnimation();
+      } else {
+        return;
+      }
+    }
 
     if (isBlocking) {
       this.play('block');
@@ -107,6 +113,15 @@ export class PlayerAnimator {
     } else {
       this.play('idle');
     }
+  }
+
+  /** Force-cancel the current one-shot animation */
+  private cancelCurrentAnimation(): void {
+    const current = this.animations.get(this.currentState);
+    if (current) {
+      current.stop();
+    }
+    this.isPlaying = false;
   }
 
   private isPlayingOneShot(): boolean {
