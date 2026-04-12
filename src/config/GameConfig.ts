@@ -41,6 +41,7 @@ export const COMBAT = {
   facingHalfAngle: Math.PI / 3,     // 60° her yana
   behindDotThreshold: -0.3,
   autoAttackRange: 2.0,
+  autoAttackSearchRadius: 8,  // T toggle — dusman arama yaricapi
   basePlayerDamage: 25,
   doubleClickTime: 0.4,
   backstabMultiplier: 1.5,
@@ -96,6 +97,12 @@ export const ENEMY_AI = {
   spawnReturnThreshold: 1,
   attackRangeEscapeMultiplier: 1.5,
   detectionReturnMultiplier: 0.7,
+} as const;
+
+// ─── DUSMAN MODEL ───
+export const ENEMY_MODEL = {
+  modelsPath: '/models/enemies/',
+  fallbackEnabled: true,
 } as const;
 
 // ─── DUSMAN GORSEL ───

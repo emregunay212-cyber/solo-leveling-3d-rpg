@@ -19,6 +19,8 @@ export enum AIState {
  */
 export class EnemyAI {
   public state = AIState.IDLE;
+  /** Animasyon tetikleme: saldiri frame'inde true olur, Enemy.update() tarafindan sifirlanir */
+  public didAttackThisFrame = false;
 
   // Detection — EnemyDef'ten okunur, yoksa global default
   private readonly DETECTION_RANGE: number;
@@ -231,6 +233,7 @@ export class EnemyAI {
         // Golge askerine saldir
         this.enemy.onAttackThreatTarget(this.enemy.def.damage);
         this.attackTimer = this.ATTACK_COOLDOWN;
+        this.didAttackThisFrame = true;
       } else if (playerAlive) {
         // Oyuncuya saldir — saldiri menzilinde ve hedefe donmus durumda
         const playerPos = this.lastPlayerPos;
@@ -241,6 +244,7 @@ export class EnemyAI {
         );
         this.enemy.onAttackPlayer(this.enemy.def.damage, isBackstab);
         this.attackTimer = this.ATTACK_COOLDOWN;
+        this.didAttackThisFrame = true;
       }
     }
   }

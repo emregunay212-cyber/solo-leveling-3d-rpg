@@ -54,6 +54,9 @@ export interface GameEvents {
   'arise:success': { shadowType: string };
   'arise:fail':    { reason: string };
 
+  // ─── Auto-Attack ───
+  'autoAttack:toggle': { enabled: boolean };
+
   // ─── Slow Motion ───
   'slowmo:start': { scale: number; duration: number };
   'slowmo:end':   Record<string, never>;

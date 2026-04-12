@@ -4,10 +4,15 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { Scene } from '@babylonjs/core/scene';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import { PhysicsAggregate } from '@babylonjs/core/Physics/v2/physicsAggregate';
 import { PhysicsShapeType } from '@babylonjs/core/Physics/v2/IPhysicsEnginePlugin';
 import { Ray } from '@babylonjs/core/Culling/ray';
-import { EnemyAI } from './EnemyAI';
+import { EnemyAI, AIState } from './EnemyAI';
+import { EnemyAnimator } from './EnemyAnimator';
+import { EnemyModelCache } from './EnemyModelCache';
+import { ENEMY_MODEL_MAP } from '../data/enemyModels';
 import type { Damageable } from '../combat/CombatSystem';
 import { ENEMY_VISUAL, SHADOW } from '../config/GameConfig';
 import { eventBus } from '../core/EventBus';
@@ -59,6 +64,18 @@ export class Enemy implements Damageable {
   private deathTimer = 0;
   private isDead = false;
   private extracted = false;
+
+  // 3D Model
+  private modelRoot: TransformNode | null = null;
+  private modelMeshes: AbstractMesh[] = [];
+  private animator: EnemyAnimator | null = null;
+  private modelLoaded = false;
+  private lastAIState: AIState = AIState.IDLE;
+
+  // Saldiri aurasi
+  private attackAura: Mesh | null = null;
+  private attackAuraMat: StandardMaterial | null = null;
+  private attackAuraTimer = 0;
 
   // Threat sistemi — golge askeri hasar verince dusmanin dikkatini ceker
   private threatPos: Vector3 | null = null;
@@ -123,6 +140,59 @@ export class Enemy implements Damageable {
     this.ai = new EnemyAI(this, spawnPos);
   }
 
+  /**
+   * GLB model yukle — capsule fallback ile.
+   * PlayerController.loadCharacterModel() paterni takip edilir.
+   */
+  public async loadModel(scene: Scene, typeKey: string): Promise<void> {
+    const config = ENEMY_MODEL_MAP[typeKey];
+    if (!config) return;
+
+    const cache = EnemyModelCache.getInstance();
+    const instance = cache.createInstance(typeKey, scene);
+    if (!instance) return;
+
+    try {
+      // Pivot olustur — PlayerController paterni
+      const pivot = new TransformNode(`enemyModel_${this.id}`, scene);
+      pivot.parent = this.mesh;
+
+      const rootNode = instance.rootNode;
+      rootNode.parent = pivot;
+      rootNode.name = `enemyModelRoot_${this.id}`;
+
+      // Olcekle: modelScale * def.scale
+      const scale = config.modelScale * this.def.scale;
+      pivot.scaling.setAll(scale);
+
+      // Y-offset: kapsulun ortasindan asagi kaydir + model ofseti
+      pivot.position.y = -(ENEMY_VISUAL.bodyHeightMultiplier * this.def.scale) / 2 + config.yOffset;
+
+      // Kapsulu gizle, model goster
+      this.mesh.isVisible = false;
+
+      // Model meshlerini kaydet — pickable birak (arise icin gerekli)
+      for (const m of rootNode.getChildMeshes()) {
+        m.isPickable = true;
+        m.alwaysSelectAsActiveMesh = true;
+        this.modelMeshes.push(m);
+      }
+
+      this.modelRoot = pivot;
+
+      // Animator kur
+      if (instance.animationGroups.length > 0) {
+        this.animator = new EnemyAnimator();
+        this.animator.registerAnimations(instance.animationGroups, config.animMap);
+        this.animator.startIdle();
+      }
+
+      this.modelLoaded = true;
+    } catch {
+      // Model setup basarisiz — capsule fallback
+    }
+  }
+
   public setOnDeath(cb: (enemy: Enemy) => void): void { this.onDeath = cb; }
   public setOnAttackPlayer(cb: (damage: number, isBackstab: boolean) => void): void { this.onAttack = cb; }
   public setOnAttackThreat(cb: (damage: number, threatPos: Vector3) => void): void { this.onAttackThreat = cb; }
@@ -134,6 +204,10 @@ export class Enemy implements Damageable {
       if (this.deathTimer <= 0) {
         this.mesh.isVisible = false;
         this.hpBarBg.isVisible = false;
+        // Model meshlerini de gizle
+        for (const m of this.modelMeshes) {
+          m.isVisible = false;
+        }
       }
       return;
     }
@@ -175,9 +249,91 @@ export class Enemy implements Damageable {
     if (this.hitFlashTimer > 0) {
       this.hitFlashTimer -= dt;
       if (this.hitFlashTimer <= 0) {
-        this.mat.diffuseColor = this.def.color.clone();
-        this.mat.emissiveColor = Color3.Black();
+        this.restoreOriginalColors();
       }
+    }
+
+    // Saldiri aurasi fade-out
+    this.updateAttackAura(dt);
+
+    // AI state → animasyon eslemesi
+    this.syncAnimationToAI();
+  }
+
+  /** AI state degisimini animasyona yansit */
+  private syncAnimationToAI(): void {
+    if (!this.animator || !this.modelLoaded) return;
+
+    const aiState = this.ai.state;
+    if (aiState === this.lastAIState && !this.ai.didAttackThisFrame) return;
+    this.lastAIState = aiState;
+
+    // Attack flag — her saldiri animasyonunu bir kez tetikler
+    if (this.ai.didAttackThisFrame) {
+      this.ai.didAttackThisFrame = false;
+      this.animator.play('attack');
+      return;
+    }
+
+    switch (aiState) {
+      case AIState.IDLE:
+        this.animator.play('idle');
+        break;
+      case AIState.PATROL:
+        this.animator.play('walk');
+        break;
+      case AIState.CHASE:
+        this.animator.play('run');
+        break;
+      case AIState.ATTACK:
+        // Attack state'inde idle bekle — vuruslar didAttackThisFrame ile tetiklenir
+        break;
+      case AIState.RETURN:
+        this.animator.play('walk');
+        break;
+      case AIState.DEAD:
+        this.animator.play('death');
+        break;
+    }
+  }
+
+  /** Saldiri sirasinda kirmizi aura goster */
+  private showAttackAura(): void {
+    const radius = ENEMY_VISUAL.bodyRadiusMultiplier * this.def.scale * 2.5;
+    if (!this.attackAura) {
+      this.attackAura = MeshBuilder.CreateTorus(`attackAura_${this.id}`, {
+        diameter: radius * 2,
+        thickness: 0.05,
+        tessellation: 24,
+      }, this.scene);
+      this.attackAuraMat = new StandardMaterial(`attackAuraMat_${this.id}`, this.scene);
+      this.attackAuraMat.diffuseColor = new Color3(0.9, 0.1, 0.1);
+      this.attackAuraMat.emissiveColor = new Color3(0.8, 0.05, 0.05);
+      this.attackAuraMat.disableLighting = true;
+      this.attackAuraMat.backFaceCulling = false;
+      this.attackAura.material = this.attackAuraMat;
+      this.attackAura.isPickable = false;
+    }
+    this.attackAura.isVisible = true;
+    this.attackAuraMat!.alpha = 0.7;
+    this.attackAuraTimer = 0.4;
+  }
+
+  /** Aura fade-out guncelle — update() icinde cagrilir */
+  private updateAttackAura(dt: number): void {
+    if (this.attackAuraTimer <= 0 || !this.attackAura || !this.attackAuraMat) return;
+    this.attackAuraTimer -= dt;
+
+    // Pozisyonu enemy'ye bagla
+    this.attackAura.position.copyFrom(this.mesh.position);
+    this.attackAura.position.y = this.position.y + 0.1;
+
+    // Fade out
+    const t = Math.max(0, this.attackAuraTimer / 0.4);
+    this.attackAuraMat.alpha = 0.7 * t;
+
+    if (this.attackAuraTimer <= 0) {
+      this.attackAura.isVisible = false;
     }
   }
 
@@ -195,10 +351,20 @@ export class Enemy implements Damageable {
       this.threatTimer = SHADOW.threatDuration;
     }
 
-    // Flash white
+    // Flash white — model ve capsule icin
     this.hitFlashTimer = ENEMY_VISUAL.hitFlashDuration;
-    this.mat.diffuseColor = new Color3(1, 1, 1);
-    this.mat.emissiveColor = new Color3(0.5, 0.5, 0.5);
+    if (this.modelLoaded) {
+      for (const m of this.modelMeshes) {
+        const material = m.material;
+        if (material && 'emissiveColor' in material) {
+          (material as StandardMaterial).emissiveColor = new Color3(0.8, 0.8, 0.8);
+        }
+      }
+      if (this.animator) this.animator.play('hitReact');
+    } else {
+      this.mat.diffuseColor = new Color3(1, 1, 1);
+      this.mat.emissiveColor = new Color3(0.5, 0.5, 0.5);
+    }
 
     // Knockback on crit
     if (isCritical) {
@@ -226,13 +392,36 @@ export class Enemy implements Damageable {
     }
   }
 
+  /** Hit flash sonrasi renkleri geri yukle */
+  private restoreOriginalColors(): void {
+    if (this.modelLoaded) {
+      for (const m of this.modelMeshes) {
+        const material = m.material;
+        if (material && 'emissiveColor' in material) {
+          (material as StandardMaterial).emissiveColor = Color3.Black();
+        }
+      }
+    } else {
+      this.mat.diffuseColor = this.def.color.clone();
+      this.mat.emissiveColor = Color3.Black();
+    }
+  }
+
   private die(): void {
     this.isDead = true;
     this.ai.onDeath();
-    this.mat.alpha = ENEMY_VISUAL.deathOpacity;
-    this.mesh.scaling.scaleInPlace(ENEMY_VISUAL.deathScale);
     this.hpBarBg.isVisible = false;
-    this.deathTimer = ENEMY_VISUAL.deathTimer;
+
+    if (this.modelLoaded && this.animator) {
+      // Death animasyonu oynat — model opacity/scale degistirmek yerine
+      this.animator.play('death');
+      this.deathTimer = ENEMY_VISUAL.deathTimer;
+    } else {
+      this.mat.alpha = ENEMY_VISUAL.deathOpacity;
+      this.mesh.scaling.scaleInPlace(ENEMY_VISUAL.deathScale);
+      this.deathTimer = ENEMY_VISUAL.deathTimer;
+    }
+
     if (this.onDeath) this.onDeath(this);
     eventBus.emit('enemy:death', {
       enemy: this,
@@ -256,7 +445,14 @@ export class Enemy implements Damageable {
   }
 
   public faceDirection(dir: Vector3): void {
-    this.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+    const angle = Math.atan2(dir.x, dir.z);
+    if (this.modelRoot) {
+      // Model yuklu: sadece modelRoot dondur, mesh rotation 0'da kalsin
+      // (modelRoot mesh'in child'i — mesh rotate olursa ikili rotation olur)
+      this.modelRoot.rotation.y = angle;
+    } else {
+      this.mesh.rotation.y = angle;
+    }
   }
 
   public heal(amount: number): void {
@@ -289,6 +485,11 @@ export class Enemy implements Damageable {
 
   public isAlive(): boolean { return !this.isDead; }
 
+  /** Verilen mesh bu enemy'nin model mesh'lerinden biri mi? (arise raycast icin) */
+  public ownsMesh(mesh: AbstractMesh): boolean {
+    return mesh === this.mesh || this.modelMeshes.includes(mesh);
+  }
+
   /** Ceset cikarilabilir mi? (olu + gorunur + henuz cikarilmamis) */
   public isExtractable(): boolean {
     return this.isDead && this.deathTimer > 0 && !this.extracted;
@@ -299,6 +500,9 @@ export class Enemy implements Damageable {
     this.extracted = true;
     this.mesh.isVisible = false;
     this.hpBarBg.isVisible = false;
+    for (const m of this.modelMeshes) {
+      m.isVisible = false;
+    }
   }
 
   public canRespawn(): boolean { return this.isDead && this.deathTimer <= 0; }
@@ -310,12 +514,26 @@ export class Enemy implements Damageable {
     this.position = pos.clone();
     this.mesh.position = pos.clone();
     this.mesh.position.y += ENEMY_VISUAL.meshYOffsetMultiplier * this.def.scale;
-    this.mesh.isVisible = true;
-    this.mesh.scaling.setAll(1);
-    this.mat.alpha = 1;
-    this.mat.diffuseColor = this.def.color.clone();
+
+    if (this.modelLoaded) {
+      // Model varken capsule gizli kalir
+      this.mesh.isVisible = false;
+      this.mesh.scaling.setAll(1);
+      // Model meshlerini tekrar goster (die'da gizlenmisti)
+      for (const m of this.modelMeshes) {
+        m.isVisible = true;
+      }
+      if (this.animator) this.animator.startIdle();
+    } else {
+      this.mesh.isVisible = true;
+      this.mesh.scaling.setAll(1);
+      this.mat.alpha = 1;
+      this.mat.diffuseColor = this.def.color.clone();
+    }
+
     this.hpBarBg.isVisible = true;
     this.hpBarFill.scaling.x = 1;
+    this.lastAIState = AIState.IDLE;
     this.ai = new EnemyAI(this, pos);
   }
 
@@ -327,12 +545,27 @@ export class Enemy implements Damageable {
         !m.name.startsWith('enemy_') && !m.name.startsWith('ehp') &&
         !m.name.startsWith('dmgNum') && !m.name.startsWith('clickRing') &&
         !m.name.startsWith('hpBg') && !m.name.startsWith('hpFill') &&
-        !m.name.startsWith('playerBody');
+        !m.name.startsWith('playerBody') &&
+        !m.name.startsWith('enemyModel_') &&
+        !this.modelMeshes.includes(m);
     });
     return hit?.hit && hit.pickedPoint ? hit.pickedPoint.y : 0;
   }
 
   public dispose(): void {
+    if (this.animator) {
+      this.animator.dispose();
+      this.animator = null;
+    }
+    if (this.modelRoot) {
+      this.modelRoot.dispose();
+      this.modelRoot = null;
+    }
+    if (this.attackAura) {
+      this.attackAura.dispose();
+      this.attackAura = null;
+    }
+    this.modelMeshes = [];
     this.mesh.dispose();
     this.hpBarBg.dispose();
     this.hpBarFill.dispose();

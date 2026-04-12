@@ -6,6 +6,7 @@ import { ComboSystem } from '../combat/ComboSystem';
 import { DamageNumbers } from '../combat/DamageNumbers';
 import { PlayerController } from './PlayerController';
 import { COMBAT } from '../config/GameConfig';
+import { eventBus } from '../core/EventBus';
 
 export class PlayerCombat {
   private input: InputManager;
@@ -22,6 +23,11 @@ export class PlayerCombat {
   // Auto-attack (Metin2 style: double-click enemy -> walk to + auto attack)
   private autoAttackTarget: Damageable | null = null;
   private readonly AUTO_ATTACK_RANGE = COMBAT.autoAttackRange;
+
+  // Auto-attack toggle (T tusu)
+  private autoAttackMode = false;
+  private autoAttackKeyWasDown = false;
+  private readonly AUTO_ATTACK_SEARCH_RADIUS: number = COMBAT.autoAttackSearchRadius;
 
   // Double-click detection
   private lastClickTime = 0;
@@ -80,12 +86,36 @@ export class PlayerCombat {
   public update(dt: number): void {
     this.comboSystem.update(dt);
 
+    // ─── Auto-attack toggle (T tusu) ───
+    const tKeyDown = this.input.isKeyDown('KeyT');
+    if (tKeyDown && !this.autoAttackKeyWasDown) {
+      this.autoAttackMode = !this.autoAttackMode;
+      eventBus.emit('autoAttack:toggle', { enabled: this.autoAttackMode });
+      if (!this.autoAttackMode) {
+        this.autoAttackTarget = null;
+        this.player.setAutoMoveTarget(null);
+      }
+    }
+    this.autoAttackKeyWasDown = tKeyDown;
+
+    // ─── Auto-attack mode: en yakin dusmani bul ───
+    if (this.autoAttackMode) {
+      // Hedef oldu veya yok → yeni hedef ara
+      if (!this.autoAttackTarget || !this.autoAttackTarget.isAlive()) {
+        this.autoAttackTarget = null;
+        this.findNearestEnemy();
+      }
+    }
+
     // ─── Auto-attack logic ───
     if (this.autoAttackTarget) {
       if (!this.autoAttackTarget.isAlive()) {
-        // Target died, stop
+        // Target died — auto-attack modundaysa yeni hedef ara
         this.autoAttackTarget = null;
         this.player.setAutoMoveTarget(null);
+        if (this.autoAttackMode) {
+          this.findNearestEnemy();
+        }
       } else {
         const playerPos = this.player.getPosition();
         const targetPos = this.autoAttackTarget.mesh.position;
@@ -126,7 +156,33 @@ export class PlayerCombat {
     // ─── Cancel auto-attack with manual movement ───
     const moveInput = this.input.getMovementVector();
     if (moveInput.x !== 0 || moveInput.z !== 0) {
+      if (this.autoAttackMode) {
+        this.autoAttackMode = false;
+        eventBus.emit('autoAttack:toggle', { enabled: false });
+      }
       this.autoAttackTarget = null;
+    }
+  }
+
+  /** 8 birim icindeki en yakin canli dusmani bul ve hedef olarak set et */
+  private findNearestEnemy(): void {
+    const playerPos = this.player.getPosition();
+    let nearest: Damageable | null = null;
+    let nearestDist = this.AUTO_ATTACK_SEARCH_RADIUS;
+
+    for (const target of this.combatSystem.getTargets()) {
+      if (!target.isAlive()) continue;
+      const toTarget = target.mesh.position.subtract(playerPos);
+      toTarget.y = 0;
+      const dist = toTarget.length();
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = target;
+      }
+    }
+
+    if (nearest) {
+      this.autoAttackTarget = nearest;
     }
   }
 
@@ -166,6 +222,7 @@ export class PlayerCombat {
     }
   }
 
+  public isAutoAttackModeEnabled(): boolean { return this.autoAttackMode; }
   public getAutoAttackTarget(): Damageable | null { return this.autoAttackTarget; }
   public cancelAutoAttack(): void { this.autoAttackTarget = null; }
   public getComboSystem(): ComboSystem { return this.comboSystem; }

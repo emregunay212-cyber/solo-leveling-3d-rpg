@@ -23,6 +23,7 @@ import { DamageCalculator } from '../combat/DamageCalculator';
 import { HUD } from '../ui/HUD';
 import { ClickIndicator } from '../ui/ClickIndicator';
 import { Enemy } from '../enemies/Enemy';
+import { EnemyModelCache } from '../enemies/EnemyModelCache';
 import { LevelSystem } from '../progression/LevelSystem';
 import { DUNGEON, SCENE, SHADOW, SKILLS, MP, SKILL_CHARGE, PARRY_CONFIG } from '../config/GameConfig';
 import { DUNGEON_RANK_DEFS } from '../dungeon/DungeonDefs';
@@ -701,6 +702,9 @@ export class DungeonScene implements GameScene {
   private initUI(scene: Scene): void {
     this.game.hud = new HUD();
     this.updateHUD();
+    eventBus.on('autoAttack:toggle', (data: { enabled: boolean }) => {
+      this.game.hud.setAutoAttack(data.enabled);
+    });
 
     this.deathScreen = new DeathScreen();
     // Dungeon ici respawn — yerinde veya sehirde
@@ -807,10 +811,14 @@ export class DungeonScene implements GameScene {
 
   // ═══════════════════════════════════════════
 
-  private spawnEnemies(scene: Scene): void {
+  private async spawnEnemies(scene: Scene): Promise<void> {
     const entries = this.dungeonManager.getEnemyDefs();
     const arenaSize = DUNGEON.arenaSize[this.rank];
     const spawnRadius = arenaSize * 0.35;
+
+    // Model preload — dungeon'da kullanilacak tum GLB'leri onceden yukle
+    const typeKeys = entries.map(e => e.typeKey);
+    await EnemyModelCache.getInstance().preloadModels(typeKeys, scene);
 
     for (const entry of entries) {
       for (let i = 0; i < entry.count; i++) {
@@ -839,6 +847,8 @@ export class DungeonScene implements GameScene {
   ): void {
     const enemy = new Enemy(scene, pos, def);
     enemy.typeKey = typeKey;
+    // 3D model yukle (fire-and-forget — preload yapildiysa aninda gelir)
+    enemy.loadModel(scene, typeKey);
     this.game.combatSystem.registerTarget(enemy);
 
     enemy.setOnDeath((e) => {
@@ -898,6 +908,8 @@ export class DungeonScene implements GameScene {
     const bossPos = new Vector3(0, 0, 0); // Arena merkezi
     const boss = new Enemy(scene, bossPos, bossDef.def);
     boss.typeKey = bossDef.typeKey;
+    // 3D model yukle
+    boss.loadModel(scene, bossDef.typeKey);
 
     // Boss gorusel farkliligi: daha buyuk
     boss.mesh.scaling.scaleInPlace(1.3);
@@ -1124,12 +1136,13 @@ export class DungeonScene implements GameScene {
 
   private handleAltLeftClick(scene: Scene): void {
     const extractPick = scene.pick(scene.pointerX, scene.pointerY, (mesh) => {
-      return mesh.name.startsWith('enemy_');
+      return this.enemies.some(e => e.ownsMesh(mesh));
     });
 
     if (extractPick?.hit && extractPick.pickedMesh) {
+      const pickedMesh = extractPick.pickedMesh;
       const deadEnemy = this.enemies.find(
-        e => e.mesh === extractPick.pickedMesh && e.isExtractable(),
+        e => e.ownsMesh(pickedMesh) && e.isExtractable(),
       );
 
       if (deadEnemy) {
@@ -1138,7 +1151,7 @@ export class DungeonScene implements GameScene {
       }
 
       const aliveEnemy = this.enemies.find(
-        e => e.mesh === extractPick.pickedMesh && e.isAlive(),
+        e => e.ownsMesh(pickedMesh) && e.isAlive(),
       );
 
       if (aliveEnemy && this.shadowArmy.getAliveCount() > 0) {

@@ -17,6 +17,7 @@ import { DamageCalculator } from '../combat/DamageCalculator';
 import { HUD } from '../ui/HUD';
 import { ClickIndicator } from '../ui/ClickIndicator';
 import { Enemy } from '../enemies/Enemy';
+import { EnemyModelCache } from '../enemies/EnemyModelCache';
 import { LevelSystem } from '../progression/LevelSystem';
 import { RespawnManager } from '../systems/RespawnManager';
 import { ENEMY_DEFS } from '../data/enemies';
@@ -392,6 +393,9 @@ export class TestScene implements GameScene {
     // Skill slot senkronizasyonu — PlayerRankSystem slot degistiginde SkillSystem + SkillBar guncelle
     this.skillSlotSyncHandler = () => { this.syncSkillSlots(); };
     eventBus.on('stat:changed', this.skillSlotSyncHandler);
+    eventBus.on('autoAttack:toggle', (data: { enabled: boolean }) => {
+      this.game.hud.setAutoAttack(data.enabled);
+    });
 
     // Tab key toggles shadow manage UI, G key toggles shadow combat mode
     this.keyHandler = (e: KeyboardEvent): void => {
@@ -462,7 +466,11 @@ export class TestScene implements GameScene {
 
   // ─── ENEMY SPAWNING ───
 
-  private spawnEnemies(scene: Scene): void {
+  private async spawnEnemies(scene: Scene): Promise<void> {
+    // Overworld dusmanlarinin modellerini onceden yukle
+    const typeKeys = Object.keys(SCENE.spawns);
+    await EnemyModelCache.getInstance().preloadModels(typeKeys, scene);
+
     for (const [type, positions] of Object.entries(SCENE.spawns)) {
       for (const s of positions) {
         this.createEnemy(scene, new Vector3(s.x, 0, s.z), type);
@@ -476,6 +484,8 @@ export class TestScene implements GameScene {
 
     const enemy = new Enemy(scene, pos, def);
     enemy.typeKey = type;
+    // 3D model yukle (fire-and-forget)
+    enemy.loadModel(scene, type);
     this.game.combatSystem.registerTarget(enemy);
 
     enemy.setOnDeath((e) => {
@@ -911,14 +921,16 @@ export class TestScene implements GameScene {
 
   /** Alt + sol tik: olu cesede → cikar, canli dusmana → golgeleri yonlendir */
   private handleAltLeftClick(scene: Scene): void {
-    // Once olu cesede cikarma dene
+    // Once olu cesede cikarma dene (capsule veya model mesh)
     const extractPick = scene.pick(scene.pointerX, scene.pointerY, (mesh) => {
-      return mesh.name.startsWith('enemy_');
+      // Sadece enemy'ye ait mesh'leri filtrele
+      return this.enemies.some(e => e.ownsMesh(mesh));
     });
 
     if (extractPick?.hit && extractPick.pickedMesh) {
+      const pickedMesh = extractPick.pickedMesh;
       const deadEnemy = this.enemies.find(
-        e => e.mesh === extractPick.pickedMesh && e.isExtractable(),
+        e => e.ownsMesh(pickedMesh) && e.isExtractable(),
       );
 
       if (deadEnemy) {
@@ -928,7 +940,7 @@ export class TestScene implements GameScene {
 
       // Canli dusman ise → golgeleri yonlendir
       const aliveEnemy = this.enemies.find(
-        e => e.mesh === extractPick.pickedMesh && e.isAlive(),
+        e => e.ownsMesh(pickedMesh) && e.isAlive(),
       );
 
       if (aliveEnemy && this.shadowArmy.getAliveCount() > 0) {

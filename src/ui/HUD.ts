@@ -14,6 +14,7 @@ export class HUD {
   private comboIndicator!: HTMLDivElement;
   private xpPopup!: HTMLDivElement;
   private blockIndicator!: HTMLDivElement;
+  private autoAttackIndicator!: HTMLDivElement;
   private xpPopupTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -306,6 +307,23 @@ export class HUD {
 
       <div class="combo-indicator" id="hud-combo"></div>
       <div class="block-indicator" id="hud-block">◈ SAVUNMA ◈</div>
+      <div id="hud-auto-attack" style="
+        position: fixed;
+        bottom: 90px;
+        right: 20px;
+        background: rgba(168, 85, 247, 0.15);
+        border: 1px solid rgba(168, 85, 247, 0.5);
+        color: #c084fc;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 4px 12px;
+        border-radius: 4px;
+        letter-spacing: 2px;
+        text-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+        display: none;
+        pointer-events: none;
+      ">AUTO [T]</div>
       <div class="xp-popup" id="hud-xp-popup"></div>
       <div class="crosshair"></div>
     `;
@@ -321,6 +339,7 @@ export class HUD {
     this.goldText = this.container.querySelector('#hud-gold') as HTMLSpanElement;
     this.comboIndicator = this.container.querySelector('#hud-combo') as HTMLDivElement;
     this.blockIndicator = this.container.querySelector('#hud-block') as HTMLDivElement;
+    this.autoAttackIndicator = this.container.querySelector('#hud-auto-attack') as HTMLDivElement;
     this.xpPopup = this.container.querySelector('#hud-xp-popup') as HTMLDivElement;
   }
 
@@ -387,6 +406,10 @@ export class HUD {
       this.comboIndicator.classList.add('active');
       setTimeout(() => this.comboIndicator.classList.remove('active'), 400);
     }
+  }
+
+  public setAutoAttack(enabled: boolean): void {
+    this.autoAttackIndicator.style.display = enabled ? 'block' : 'none';
   }
 
   public dispose(): void {

@@ -4,13 +4,18 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { Scene } from '@babylonjs/core/scene';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import { Ray } from '@babylonjs/core/Culling/ray';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
-import { ShadowAI } from './ShadowAI';
+import { ShadowAI, ShadowState } from './ShadowAI';
 import type { ShadowCombatMode } from './ShadowAI';
 import { ShadowSkillRunner } from './ShadowSkillRunner';
 import { SHADOW, ENEMY_VISUAL } from '../config/GameConfig';
 import { calculateShadowStats } from './ShadowStatCalculator';
+import { EnemyModelCache } from '../enemies/EnemyModelCache';
+import { EnemyAnimator } from '../enemies/EnemyAnimator';
+import { ENEMY_MODEL_MAP } from '../data/enemyModels';
 import type { ShadowProfile, ShadowFinalStats, PlayerStats } from './ShadowEnhancementTypes';
 import type { DamageNumbers } from '../combat/DamageNumbers';
 import type { EnemyDef } from '../enemies/Enemy';
@@ -48,6 +53,15 @@ export class ShadowSoldier {
   public finalStats: ShadowFinalStats | null = null;
   private skillRunner: ShadowSkillRunner | null = null;
   private onKillCallback: ((uid: number, enemyLevel: number, isBoss: boolean) => void) | null = null;
+  private modelRoot: TransformNode | null = null;
+  private modelMeshes: AbstractMesh[] = [];
+  private shadowAnimator: EnemyAnimator | null = null;
+  private modelLoaded = false;
+  private lastShadowState: ShadowState = ShadowState.FOLLOW;
+  public sourceTypeKey = '';
+  private attackAura: Mesh | null = null;
+  private attackAuraMat: StandardMaterial | null = null;
+  private attackAuraTimer = 0;
   private nameLabel: Mesh;
   private nameLabelTexture: DynamicTexture;
   private nameLabelMat: StandardMaterial;
@@ -166,6 +180,60 @@ export class ShadowSoldier {
     );
   }
 
+  /**
+   * Kaynak dusmanin 3D modelini yukle — saydam mor golge versiyonu.
+   */
+  public async loadModel(typeKey: string): Promise<void> {
+    const config = ENEMY_MODEL_MAP[typeKey];
+    if (!config) return;
+
+    const cache = EnemyModelCache.getInstance();
+    const instance = cache.createInstance(typeKey, this.scene);
+    if (!instance) return;
+
+    try {
+      const pivot = new TransformNode(`shadowModel_${this.id}`, this.scene);
+      pivot.parent = this.mesh;
+
+      const rootNode = instance.rootNode;
+      rootNode.parent = pivot;
+
+      const scale = config.modelScale * this.def.scale * SHADOW.shadowScale;
+      pivot.scaling.setAll(scale);
+      pivot.position.y = -(ENEMY_VISUAL.bodyHeightMultiplier * this.def.scale * SHADOW.shadowScale) / 2 + config.yOffset;
+
+      // Kapsulu gizle
+      this.mesh.isVisible = false;
+
+      // Model meshlerini kaydet + saydam mor materyal uygula
+      for (const m of rootNode.getChildMeshes()) {
+        m.isPickable = false;
+        m.alwaysSelectAsActiveMesh = true;
+        this.modelMeshes.push(m);
+
+        // Her mesh'e saydam mor golge materyali uygula
+        const shadowMat = new StandardMaterial(`shadowModelMat_${this.id}_${m.name}`, this.scene);
+        shadowMat.diffuseColor = new Color3(SHADOW.color.r, SHADOW.color.g, SHADOW.color.b);
+        shadowMat.emissiveColor = new Color3(SHADOW.emissive.r, SHADOW.emissive.g, SHADOW.emissive.b);
+        shadowMat.alpha = SHADOW.alpha;
+        m.material = shadowMat;
+      }
+
+      this.modelRoot = pivot;
+      this.sourceTypeKey = typeKey;
+      this.modelLoaded = true;
+
+      // Animator kur — golge de animasyonlu olacak
+      if (instance.animationGroups.length > 0) {
+        this.shadowAnimator = new EnemyAnimator();
+        this.shadowAnimator.registerAnimations(instance.animationGroups, config.animMap);
+        this.shadowAnimator.startIdle();
+      }
+    } catch {
+      // Fallback: capsule kalir
+    }
+  }
+
   public update(ctx: GameContext, enemies: Enemy[], otherShadowPositions: Vector3[] = []): void {
     if (this.isDead) return;
     const dt = ctx.deltaTime;
@@ -185,6 +253,7 @@ export class ShadowSoldier {
       // Periyodik AoE hasar (Cehennem Atesi vb.)
       const periodicAoe = this.skillRunner.getPeriodicAoeDamage(this.damage);
       if (periodicAoe.damage > 0 && periodicAoe.aoeRadius > 0) {
+        this.showAttackAura(); // AoE yetenek aktif — aura goster
         for (const enemy of enemies) {
           if (!enemy.isAlive()) continue;
           const dx = enemy.position.x - this.position.x;
@@ -223,8 +292,23 @@ export class ShadowSoldier {
 
     // Saldiri + hasar sayisi goster
     if (this.ai.shouldAttack()) {
+      // Saldiri animasyonu tetikle
+      if (this.shadowAnimator) this.shadowAnimator.play('attack');
+
       const target = this.ai.getCurrentTarget();
       if (target && target.isAlive()) {
+        // Hedefe don
+        const toTarget = target.position.subtract(this.position);
+        toTarget.y = 0;
+        if (toTarget.lengthSquared() > 0.01) {
+          const angle = Math.atan2(toTarget.x, toTarget.z);
+          if (this.modelRoot) {
+            this.modelRoot.rotation.y = angle;
+          } else {
+            this.mesh.rotation.y = angle;
+          }
+        }
+
         // Aktif buff'lardan bonus hasar hesapla
         const bonusPercent = this.skillRunner?.getActiveBonusDamagePercent() ?? 0;
         const effectiveDamage = Math.round(this.damage * (1 + bonusPercent));
@@ -236,6 +320,11 @@ export class ShadowSoldier {
         // Skill tetikleme: onAttack (Shadow Cleave AoE vb.)
         const attackResult = this.skillRunner?.onAttack(target, this.position, effectiveDamage, nearbyAllies);
         const totalDamage = effectiveDamage + (attackResult?.bonusDamage ?? 0);
+
+        // Yetenek tetiklendiyse kirmizi aura goster
+        if (attackResult && (attackResult.bonusDamage > 0 || attackResult.aoeRadius > 0)) {
+          this.showAttackAura();
+        }
 
         target.takeDamage(totalDamage, false, this.position, true);
         this.ai.resetAttackTimer();
@@ -299,9 +388,100 @@ export class ShadowSoldier {
     this.nameLabel.position.y = this.hpBarBg.position.y + 0.15;
     this.nameLabel.position.z = this.mesh.position.z;
 
-    // Yonu dusmana cevir
+    // Yonu dusmana/hedefe cevir
+    let faceAngle: number | null = null;
     if (vel.lengthSquared() > 0.01) {
-      this.mesh.rotation.y = Math.atan2(vel.x, vel.z);
+      faceAngle = Math.atan2(vel.x, vel.z);
+    } else {
+      // Hareket yoksa hedefe don (ATTACK state'inde onemli)
+      const currentTarget = this.ai.getCurrentTarget();
+      if (currentTarget && currentTarget.isAlive()) {
+        const toTarget = currentTarget.position.subtract(this.position);
+        toTarget.y = 0;
+        if (toTarget.lengthSquared() > 0.01) {
+          faceAngle = Math.atan2(toTarget.x, toTarget.z);
+        }
+      }
+    }
+    if (faceAngle !== null) {
+      if (this.modelRoot) {
+        this.modelRoot.rotation.y = faceAngle;
+      } else {
+        this.mesh.rotation.y = faceAngle;
+      }
+    }
+
+    // Saldiri aurasi fade-out
+    this.updateAttackAura(dt);
+
+    // AI state → animasyon senkronizasyonu
+    if (this.shadowAnimator && this.modelLoaded) {
+      const aiState = this.ai.state;
+      if (aiState !== this.lastShadowState) {
+        this.lastShadowState = aiState;
+        switch (aiState) {
+          case ShadowState.FOLLOW:
+            this.shadowAnimator.play(vel.lengthSquared() > 0.01 ? 'walk' : 'idle');
+            break;
+          case ShadowState.CHASE:
+            this.shadowAnimator.play('run');
+            break;
+          case ShadowState.ATTACK:
+            // Attack animasyonu shouldAttack() tarafindan tetiklenir, burada idle bekle
+            break;
+          case ShadowState.RETURN:
+            this.shadowAnimator.play('walk');
+            break;
+          case ShadowState.DEAD:
+            this.shadowAnimator.play('death');
+            break;
+        }
+      }
+      // FOLLOW state'inde hareket/durma gecisi
+      if (aiState === ShadowState.FOLLOW) {
+        const moving = vel.lengthSquared() > 0.01;
+        const currentAnim = this.shadowAnimator.getCurrentState();
+        if (moving && currentAnim === 'idle') {
+          this.shadowAnimator.play('walk');
+        } else if (!moving && currentAnim === 'walk') {
+          this.shadowAnimator.play('idle');
+        }
+      }
+    }
+  }
+
+  /** Saldiri sirasinda kirmizi aura goster */
+  private showAttackAura(): void {
+    const scale = this.def.scale * SHADOW.shadowScale;
+    const radius = ENEMY_VISUAL.bodyRadiusMultiplier * scale * 2.5;
+    if (!this.attackAura) {
+      this.attackAura = MeshBuilder.CreateTorus(`shadowAura_${this.id}`, {
+        diameter: radius * 2,
+        thickness: 0.05,
+        tessellation: 24,
+      }, this.scene);
+      this.attackAuraMat = new StandardMaterial(`shadowAuraMat_${this.id}`, this.scene);
+      this.attackAuraMat.diffuseColor = new Color3(0.9, 0.1, 0.1);
+      this.attackAuraMat.emissiveColor = new Color3(0.8, 0.05, 0.05);
+      this.attackAuraMat.disableLighting = true;
+      this.attackAuraMat.backFaceCulling = false;
+      this.attackAura.material = this.attackAuraMat;
+      this.attackAura.isPickable = false;
+    }
+    this.attackAura.isVisible = true;
+    this.attackAuraMat!.alpha = 0.7;
+    this.attackAuraTimer = 0.4;
+  }
+
+  private updateAttackAura(dt: number): void {
+    if (this.attackAuraTimer <= 0 || !this.attackAura || !this.attackAuraMat) return;
+    this.attackAuraTimer -= dt;
+    this.attackAura.position.copyFrom(this.mesh.position);
+    this.attackAura.position.y = this.position.y + 0.1;
+    const t = Math.max(0, this.attackAuraTimer / 0.4);
+    this.attackAuraMat.alpha = 0.7 * t;
+    if (this.attackAuraTimer <= 0) {
+      this.attackAura.isVisible = false;
     }
   }
 
@@ -389,6 +569,9 @@ export class ShadowSoldier {
     this.mesh.isVisible = false;
     this.hpBarBg.isVisible = false;
     this.nameLabel.isVisible = false;
+    for (const m of this.modelMeshes) {
+      m.isVisible = false;
+    }
   }
 
   public isAlive(): boolean { return !this.isDead; }
@@ -399,9 +582,12 @@ export class ShadowSoldier {
     const hit = this.scene.pickWithRay(ray, (m) => {
       return m !== this.mesh && m.isPickable && m.isEnabled() &&
         !m.name.startsWith('shadow_') && !m.name.startsWith('shp') &&
+        !m.name.startsWith('shadowModel_') &&
         !m.name.startsWith('enemy_') && !m.name.startsWith('ehp') &&
+        !m.name.startsWith('enemyModel_') &&
         !m.name.startsWith('dmgNum') && !m.name.startsWith('clickRing') &&
-        !m.name.startsWith('playerBody');
+        !m.name.startsWith('playerBody') &&
+        !this.modelMeshes.includes(m);
     });
     return hit?.hit && hit.pickedPoint ? hit.pickedPoint.y : 0;
   }
@@ -424,6 +610,19 @@ export class ShadowSoldier {
   }
 
   public dispose(): void {
+    if (this.shadowAnimator) {
+      this.shadowAnimator.dispose();
+      this.shadowAnimator = null;
+    }
+    if (this.modelRoot) {
+      this.modelRoot.dispose();
+      this.modelRoot = null;
+    }
+    if (this.attackAura) {
+      this.attackAura.dispose();
+      this.attackAura = null;
+    }
+    this.modelMeshes = [];
     this.mesh.dispose();
     this.hpBarBg.dispose();
     this.hpBarFill.dispose();

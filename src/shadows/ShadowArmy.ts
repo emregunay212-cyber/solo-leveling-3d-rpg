@@ -120,6 +120,11 @@ export class ShadowArmy {
     shadow.setMode(this.armyMode);
     if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
     this.bindShadowOnKill(shadow);
+    // 3D model yukle (fire-and-forget — model yuklenmezse capsule fallback)
+    if (typeKey) {
+      shadow.sourceTypeKey = typeKey;
+      shadow.loadModel(typeKey);
+    }
     this.shadows.push(shadow);
 
     eventBus.emit('shadow:extracted', {
@@ -219,6 +224,7 @@ export class ShadowArmy {
       slot.profiles = [];
     }
 
+    const typeKey = slot.enemyDefId;
     const shadow = new ShadowSoldier(this.scene, position, def, this.playerStats, profile);
     if (!profile) {
       shadow.setHpPercent(hpPercent);
@@ -226,6 +232,10 @@ export class ShadowArmy {
     shadow.setMode(this.armyMode);
     if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
     this.bindShadowOnKill(shadow);
+    if (typeKey) {
+      shadow.sourceTypeKey = typeKey;
+      shadow.loadModel(typeKey);
+    }
     this.shadows.push(shadow);
     return true;
   }
@@ -242,6 +252,7 @@ export class ShadowArmy {
     if (!slot.enemyDef || profileIndex < 0 || profileIndex >= slot.profiles.length) return false;
 
     const def = slot.enemyDef;
+    const typeKey2 = slot.enemyDefId;
     const profile = slot.profiles[profileIndex];
     const hpPercent = slot.hpPercents[profileIndex];
 
@@ -262,6 +273,10 @@ export class ShadowArmy {
     shadow.setMode(this.armyMode);
     if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
     this.bindShadowOnKill(shadow);
+    if (typeKey2) {
+      shadow.sourceTypeKey = typeKey2;
+      shadow.loadModel(typeKey2);
+    }
     this.shadows.push(shadow);
     return true;
   }
@@ -287,8 +302,8 @@ export class ShadowArmy {
   }
 
   /** Aktif golgelerin profil + HP verisini kaydet (sahne gecisi icin) */
-  public exportActiveShadows(): { profile: ShadowProfile; hpPercent: number; def: EnemyDef }[] {
-    const result: { profile: ShadowProfile; hpPercent: number; def: EnemyDef }[] = [];
+  public exportActiveShadows(): { profile: ShadowProfile; hpPercent: number; def: EnemyDef; typeKey: string }[] {
+    const result: { profile: ShadowProfile; hpPercent: number; def: EnemyDef; typeKey: string }[] = [];
     for (const shadow of this.shadows) {
       if (!shadow.isAlive()) continue;
       const profile = shadow.getProfile();
@@ -297,6 +312,7 @@ export class ShadowArmy {
           profile: { ...profile, hpPercent: shadow.hp / shadow.maxHp },
           hpPercent: shadow.hp / shadow.maxHp,
           def: shadow.def,
+          typeKey: shadow.sourceTypeKey,
         });
       }
     }
@@ -305,7 +321,7 @@ export class ShadowArmy {
 
   /** Kaydedilmis aktif golgeleri yeniden olustur (sahne gecisi icin) */
   public importActiveShadows(
-    saved: { profile: ShadowProfile; hpPercent: number; def: EnemyDef }[],
+    saved: { profile: ShadowProfile; hpPercent: number; def: EnemyDef; typeKey?: string }[],
   ): void {
     for (const entry of saved) {
       const shadow = new ShadowSoldier(
@@ -315,6 +331,11 @@ export class ShadowArmy {
       shadow.setMode(this.armyMode);
       if (this.damageNumbers) shadow.setDamageNumbers(this.damageNumbers);
       this.bindShadowOnKill(shadow);
+      // 3D model yukle (sahne gecisi sonrasi)
+      if (entry.typeKey) {
+        shadow.sourceTypeKey = entry.typeKey;
+        shadow.loadModel(entry.typeKey);
+      }
       this.shadows.push(shadow);
     }
   }
